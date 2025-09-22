@@ -2,7 +2,7 @@
 #
 # Get latest from https://github.com/github/gitignore/blob/master/Unity.gitignore
 #
-/[Ll]ibrary/*
+/[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
 /[Bb]uild/
@@ -10,8 +10,7 @@
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 
-# MemoryCaptures can get excessive in size.
-# They also could contain extremely sensitive data
+# MemoryCaptures can get excessive in size and contain sensitive data
 /[Mm]emoryCaptures/
 
 # Asset meta data should only be ignored when the corresponding asset is also ignored
@@ -48,8 +47,6 @@ ExportedObj/
 *.VC.db
 
 # Common IntelliJ Platform excludes
-
-# User specific
 **/.idea/**/workspace.xml
 **/.idea/**/tasks.xml
 **/.idea/shelf/*
@@ -65,12 +62,9 @@ ExportedObj/
 **/.idea/**/dynamic.xml
 
 # Rider
-# Rider auto-generates .iml files, and contentModel.xml
 **/.idea/**/*.iml
 **/.idea/**/contentModel.xml
 **/.idea/**/modules.xml
-
-.idea
 
 # Unity3D generated meta files
 *.pidb.meta
@@ -95,8 +89,35 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
-# Block Fishnet config
-/[Aa]ssets/FishNet.Config.XML*
-# Explicitly Allow Fishnet Settings
-!/[Ll]ibrary/
-!/[Ll]ibrary/FishNet.Runtime.Editor.PrefabObjects.Generation.Settings.json
+# FishNet configuration (move to Assets if needed)
+# /[Aa]ssets/FishNet.Config.XML*
+# !/[Aa]ssets/FishNet.Config.XML  # Uncomment and adjust if using a specific config file
+
+# User-specific settings
+/[Uu]ser[Ss]ettings/*.*
+
+# Additional plugin temp files (if applicable)
+# /[Aa]ssets/Plugins/*/Temp/
+
+# Executables and platform-specific builds
+*.exe
+*.dll
+*.app
+*.log
+*.db
+
+# Extra build artifacts
+Build/
+Builds/
+bin/
+obj/
+
+# MacOS and Windows system files
+.DS_Store
+Thumbs.db
+
+# Ignore videos
+*.mp4
+
+# Dataset files (if not using Git LFS)
+Assets/EasyVolumeRendering/DataFiles/

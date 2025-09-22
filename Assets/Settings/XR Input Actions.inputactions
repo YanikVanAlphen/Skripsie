@@ -1,5 +1,5 @@
 {
-    "name": "XRI Default Input Actions",
+    "name": "XR Input Actions",
     "maps": [
         {
             "name": "XRI Head",
@@ -1534,6 +1534,34 @@
                     "processors": "",
                     "groups": "",
                     "action": "Click",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "XRI LeftHand X",
+            "id": "d5826028-afb2-40ce-af64-5db3128ffaa5",
+            "actions": [
+                {
+                    "name": "LeftXButton",
+                    "type": "Button",
+                    "id": "84291c4e-860b-4ea6-80c7-e5f4c47b88c6",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "459677c2-14ea-4b8a-b6b7-f64f32a48303",
+                    "path": "<XRController>{LeftHand}/{PrimaryButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LeftXButton",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
