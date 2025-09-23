@@ -664,6 +664,12 @@ MonoBehaviour:
   m_LightCookieSize: {x: 1, y: 1}
   m_LightCookieOffset: {x: 0, y: 0}
   m_SoftShadowQuality: 1
+--- !u!1 &1046704468 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6337252249514343428, guid: 8dbcbc433abbd694e8376675298e4f02,
+    type: 3}
+  m_PrefabInstance: {fileID: 1070816311}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1070816311
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -715,7 +721,7 @@ PrefabInstance:
     - target: {fileID: 6337252249514343430, guid: 8dbcbc433abbd694e8376675298e4f02,
         type: 3}
       propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
-      value: 5
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 6337252249514343430, guid: 8dbcbc433abbd694e8376675298e4f02,
         type: 3}
@@ -739,8 +745,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6337252249514343430, guid: 8dbcbc433abbd694e8376675298e4f02,
         type: 3}
+      propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgument
+      value: 
+      objectReference: {fileID: 1046704468}
+    - target: {fileID: 6337252249514343430, guid: 8dbcbc433abbd694e8376675298e4f02,
+        type: 3}
       propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
-      value: UnityEngine.Object, UnityEngine
+      value: UnityEngine.GameObject, UnityEngine
       objectReference: {fileID: 0}
     - target: {fileID: 6337252250175947171, guid: 8dbcbc433abbd694e8376675298e4f02,
         type: 3}
@@ -917,6 +928,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   networkManager: {fileID: 1696469385}
   mainMenuCanvas: {fileID: 1070816313}
+  ipInputFieldObject: {fileID: 1046704468}
 --- !u!1 &1154433762
 GameObject:
   m_ObjectHideFlags: 0
