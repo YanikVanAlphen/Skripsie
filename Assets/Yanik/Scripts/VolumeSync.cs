@@ -1,94 +1,80 @@
 using FishNet.Object;
-using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityVolumeRendering;
-using System.Collections;
 
 public class VolumeSync : NetworkBehaviour
 {
-  [SyncVar(OnChange = nameof(OnRenderModeChanged))]
-  private UnityVolumeRendering.RenderMode renderMode = UnityVolumeRendering.RenderMode.DirectVolumeRendering;
-
-  [SyncVar(OnChange = nameof(OnVisibilityWindowChanged))]
-  private Vector2 visibilityWindow = new Vector2(0.0f, 1.0f);
-
   private VolumeRenderedObject volumeObject;
 
   private void Awake()
   {
-    // Defer initialization to coroutine to wait for VolumeRenderedObject
     StartCoroutine(InitializeVolumeObject());
   }
 
-  private IEnumerator InitializeVolumeObject()
+  private System.Collections.IEnumerator InitializeVolumeObject()
   {
-    // Wait for VolumeRenderedObject to be added
-    while (volumeObject == null)
+    int retryCount = 0;
+    const int maxRetries = 40; // Wait up to 20 seconds
+    while (volumeObject == null && retryCount < maxRetries)
     {
-      volumeObject = GetComponent<VolumeRenderedObject>();
+      volumeObject = FindObjectOfType<VolumeRenderedObject>();
       if (volumeObject == null)
       {
         Debug.Log("Waiting for VolumeRenderedObject component...");
+        retryCount++;
         yield return new WaitForSeconds(0.5f);
       }
     }
 
+    if (volumeObject == null)
+    {
+      Debug.LogError("Failed to find VolumeRenderedObject after max retries.");
+      yield break;
+    }
+
     Debug.Log("VolumeSync initialized with VolumeRenderedObject.");
-    // Apply initial settings
     ApplyRenderSettings();
   }
 
-  public void UpdateRenderMode(UnityVolumeRendering.RenderMode newMode)
+  [ServerRpc(RequireOwnership = false)]
+  public void UpdateRenderMode(UnityVolumeRendering.RenderMode mode)
   {
-    if (IsServer)
+    if (volumeObject != null)
     {
-      renderMode = newMode;
-    }
-    else
-    {
-      CmdUpdateRenderMode(newMode);
+      volumeObject.SetRenderMode(mode);
+      RpcUpdateRenderMode(mode);
+      Debug.Log($"Render mode updated to {mode}");
     }
   }
 
-  public void UpdateVisibleRange(Vector2 newRange)
+  [ObserversRpc]
+  private void RpcUpdateRenderMode(UnityVolumeRendering.RenderMode mode)
   {
-    if (IsServer)
+    if (volumeObject != null)
     {
-      visibilityWindow = newRange;
-    }
-    else
-    {
-      CmdUpdateVisibleRange(newRange);
+      volumeObject.SetRenderMode(mode);
+      Debug.Log($"Client updated render mode to {mode}");
     }
   }
 
   [ServerRpc(RequireOwnership = false)]
-  private void CmdUpdateRenderMode(UnityVolumeRendering.RenderMode newMode)
-  {
-    renderMode = newMode;
-  }
-
-  [ServerRpc(RequireOwnership = false)]
-  private void CmdUpdateVisibleRange(Vector2 newRange)
-  {
-    visibilityWindow = newRange;
-  }
-
-  private void OnRenderModeChanged(UnityVolumeRendering.RenderMode oldMode, UnityVolumeRendering.RenderMode newMode, bool asServer)
+  public void UpdateVisibleRange(Vector2 range)
   {
     if (volumeObject != null)
     {
-      volumeObject.SetRenderMode(newMode);
-      Debug.Log($"Render mode updated to {newMode} on {(asServer ? "server" : "client")}.");
+      volumeObject.SetVisibilityWindow(range);
+      RpcUpdateVisibleRange(range);
+      Debug.Log($"Visibility window updated to {range}");
     }
   }
 
-  private void OnVisibilityWindowChanged(Vector2 oldRange, Vector2 newRange, bool asServer)
+  [ObserversRpc]
+  private void RpcUpdateVisibleRange(Vector2 range)
   {
     if (volumeObject != null)
     {
-      volumeObject.SetVisibilityWindow(newRange);
-      Debug.Log($"Visibility window updated to {newRange} on {(asServer ? "server" : "client")}.");
+      volumeObject.SetVisibilityWindow(range);
+      Debug.Log($"Client updated visibility window to {range}");
     }
   }
 
@@ -96,8 +82,8 @@ public class VolumeSync : NetworkBehaviour
   {
     if (volumeObject != null)
     {
-      volumeObject.SetRenderMode(renderMode);
-      volumeObject.SetVisibilityWindow(visibilityWindow);
+      volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
+      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
       Debug.Log("Applied initial render settings.");
     }
   }

@@ -7,12 +7,26 @@ using System.Linq; // for FirstOrDefault
 using FishNet.Managing.Object; // for DefaultPrefabs
 using System.IO;
 
+/* RENDERING OPTIONS:
+     * RenderMode.DirectVolumeRendering
+     * RenderMode.MaximumIntensityProjectipon (plugin author's typo)
+     * RenderMode.IsosurfaceRendering
+     */
+
+using FishNet.Object;
+using FishNet.Connection;
+using FishNet.Component.Transforming;
+using UnityEngine;
+using UnityVolumeRendering;
+using System.IO;
+using System.Linq;
+
 public class VolumeDataNetworker : NetworkBehaviour
 {
   [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Relative to Assets (Editor) or StreamingAssets (build)
-  [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 1f, 2f); // In front of VR camera
+  [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 2f, 0f); // above origin
   [SerializeField] private Quaternion defaultRotation = Quaternion.identity;
-  [SerializeField] private GameObject volumeRenderedObjectPrefab; // Assign VolumeRenderedObjectPrefab.prefab (with NetworkObject, NetworkTransform, VolumeSync, OwnershipManager)
+  [SerializeField] private GameObject volumeRenderedObjectPrefab; // Assign VolumeRenderedObjectPrefab.prefab (with NetworkObject, NetworkTransform, VolumeSync, OwnershipManager, VolumeRenderedObject, VolumeContainer)
 
   private VolumeRenderedObject volumeObject;
 
@@ -20,6 +34,8 @@ public class VolumeDataNetworker : NetworkBehaviour
   {
     if (IsServer)
     {
+      // Register prefab at start
+      RegisterPrefab();
       // Host creates and networks VolumeRenderedObject
       StartCoroutine(NetworkVolumeObject());
     }
@@ -32,6 +48,44 @@ public class VolumeDataNetworker : NetworkBehaviour
     {
       // Client assigns local dataset to networked object
       StartCoroutine(AssignLocalDataset());
+    }
+  }
+
+  private void RegisterPrefab()
+  {
+    if (volumeRenderedObjectPrefab == null)
+    {
+      Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker!");
+      return;
+    }
+
+    NetworkObject prefabNetworkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+    if (prefabNetworkObject != null)
+    {
+      PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
+      bool isRegistered = false;
+      for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
+      {
+        if (prefabObjects.GetObject(true, i) == prefabNetworkObject)
+        {
+          isRegistered = true;
+          break;
+        }
+      }
+
+      if (!isRegistered)
+      {
+        prefabObjects.AddObject(prefabNetworkObject);
+        Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId} in SpawnablePrefabs.");
+      }
+      else
+      {
+        Debug.Log($"VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId} already registered.");
+      }
+    }
+    else
+    {
+      Debug.LogError("VolumeRenderedObjectPrefab missing NetworkObject component!");
     }
   }
 
@@ -119,81 +173,149 @@ public class VolumeDataNetworker : NetworkBehaviour
       yield break;
     }
 
-    // Create VolumeRenderedObject using VolumeObjectFactory
-    VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
-    GameObject volumeGameObject = volObj.gameObject;
-    volumeObject = volObj;
+    // Instantiate prefab
+    GameObject volumeGameObject = Instantiate(volumeRenderedObjectPrefab);
+    volumeObject = volumeGameObject.GetComponent<VolumeRenderedObject>();
     if (volumeObject == null)
     {
-      Debug.LogError("VolumeObjectFactory failed to create VolumeRenderedObject!");
-      Destroy(volumeGameObject);
-      yield break;
+      volumeObject = volumeGameObject.AddComponent<VolumeRenderedObject>();
     }
+
+    // Assign dataset
+    volumeObject.dataset = dataset;
 
     // Set position, rotation, and scale
     volumeGameObject.transform.position = position ?? defaultPosition;
     volumeGameObject.transform.rotation = rotation ?? defaultRotation;
-    volumeGameObject.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f); // Adjust scale for visibility
+    volumeGameObject.transform.localScale = new Vector3(1f, 1f, 1f); // Adjust scale for visibility
 
-    // Add networking components
+    // Verify NetworkObject
     NetworkObject networkObject = volumeGameObject.GetComponent<NetworkObject>();
     if (networkObject == null)
     {
-      networkObject = volumeGameObject.AddComponent<NetworkObject>();
-    }
-
-    // Ensure NetworkTransform, VolumeSync, and OwnershipManager
-    if (volumeGameObject.GetComponent<FishNet.Component.Transforming.NetworkTransform>() == null)
-    {
-      volumeGameObject.AddComponent<FishNet.Component.Transforming.NetworkTransform>();
-    }
-    if (volumeGameObject.GetComponent<VolumeSync>() == null)
-    {
-      volumeGameObject.AddComponent<VolumeSync>();
-    }
-    if (volumeGameObject.GetComponent<uMuVR.OwnershipManager>() == null)
-    {
-      volumeGameObject.AddComponent<uMuVR.OwnershipManager>();
+      Debug.LogError("Instantiated VolumeRenderedObjectPrefab missing NetworkObject!");
+      Destroy(volumeGameObject);
+      yield break;
     }
 
     // Verify VolumeContainer
     Transform volumeContainer = volumeGameObject.transform.Find("VolumeContainer");
+    MeshRenderer meshRenderer = null;
     if (volumeContainer != null)
     {
-      MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
+      meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
       if (meshRenderer != null && meshRenderer.sharedMaterial != null)
       {
+        Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+        if (volumeShader != null && meshRenderer.sharedMaterial.shader != volumeShader)
+        {
+          Debug.LogWarning($"VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected VolumeRendering/DirectVolumeRenderingShader. Updating material.");
+          meshRenderer.sharedMaterial = new Material(volumeShader);
+        }
         Debug.Log($"VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
       }
       else
       {
-        Debug.LogWarning("VolumeContainer missing MeshRenderer or material!");
+        Debug.LogWarning("VolumeContainer missing MeshRenderer or material! Creating material.");
+        meshRenderer = volumeContainer.gameObject.GetComponent<MeshRenderer>();
+        if (meshRenderer == null)
+        {
+          meshRenderer = volumeContainer.gameObject.AddComponent<MeshRenderer>();
+        }
+        Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+        if (volumeShader != null)
+        {
+          meshRenderer.material = new Material(volumeShader);
+          Debug.Log($"Applied shader VolumeRendering/DirectVolumeRenderingShader.");
+        }
+        else
+        {
+          Debug.LogWarning("Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
+          meshRenderer.material = new Material(Shader.Find("Standard"));
+        }
       }
     }
     else
     {
-      Debug.LogWarning("VolumeContainer child not found in VolumeRenderedObject!");
+      Debug.LogWarning("VolumeContainer child not found in VolumeRenderedObject! Creating manually.");
+      GameObject container = new GameObject("VolumeContainer");
+      container.transform.SetParent(volumeGameObject.transform, false);
+      container.transform.localPosition = Vector3.zero;
+      container.transform.localRotation = Quaternion.identity;
+      container.transform.localScale = Vector3.one;
+      MeshFilter meshFilter = container.AddComponent<MeshFilter>();
+      meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().mesh;
+      Destroy(GameObject.Find("Cube")); // Remove temporary cube
+      meshRenderer = container.AddComponent<MeshRenderer>();
+      Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+      if (volumeShader != null)
+      {
+        meshRenderer.material = new Material(volumeShader);
+        Debug.Log($"Applied shader VolumeRendering/DirectVolumeRenderingShader.");
+      }
+      else
+      {
+        Debug.LogWarning("Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
+        meshRenderer.material = new Material(Shader.Find("Standard"));
+      }
+    }
+
+    // Set up material properties
+    if (meshRenderer != null && meshRenderer.sharedMaterial != null)
+    {
+      Texture3D dataTexture = dataset.GetDataTexture();
+      if (dataTexture != null)
+      {
+        meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
+        Debug.Log("Assigned dataset texture to material.");
+      }
+      else
+      {
+        Debug.LogWarning("Failed to get dataset texture for VolumeContainer material.");
+      }
+
+      UnityVolumeRendering.TransferFunction tf = TransferFunctionDatabase.CreateTransferFunction();
+      volumeObject.transferFunction = tf;
+      Texture2D tfTexture = tf.GetTexture();
+      if (tfTexture != null)
+      {
+        meshRenderer.sharedMaterial.SetTexture("_TFTex", tfTexture);
+        Debug.Log("Assigned transfer function texture to material.");
+      }
+      else
+      {
+        Debug.LogWarning("Failed to get transfer function texture.");
+      }
+
+      // Generate noise texture (mimicking VolumeObjectFactory)
+      const int noiseDimX = 512;
+      const int noiseDimY = 512;
+      Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
+      if (noiseTexture != null)
+      {
+        meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture);
+        Debug.Log("Assigned noise texture to material.");
+      }
+      else
+      {
+        Debug.LogWarning("Failed to generate noise texture.");
+      }
+
+      // Set shader keywords
+      meshRenderer.sharedMaterial.EnableKeyword("MODE_DVR");
+      meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
+      meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
+
+      // Assign meshRenderer to VolumeRenderedObject
+      volumeObject.meshRenderer = meshRenderer;
     }
 
     // Set initial render settings
-    /*
-     * Rendering Options:
-     * RenderMode.DirectVolumeRendering
-     * RenderMode.MaximumIntensityProjectipon (plugin author type lol)
-     * RenderMode.IsosurfaceRendering
-     */
     volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
     volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f)); // Adjusted for VisMale.raw range (1-254)
-    volumeObject.UpdateMaterialProperties(null);
-    Debug.Log($"Server loaded dataset from {fullPath} with dimensions {dimX}x{dimY}x{dimZ}");
+    volumeObject.UpdateMaterialProperties();
 
-    // Ensure prefab is registered
-    NetworkObject prefabNetworkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
-    if (prefabNetworkObject != null)
-    {
-      NetworkManager.SpawnablePrefabs.AddObject(prefabNetworkObject);
-      Debug.Log("Registered VolumeRenderedObjectPrefab in SpawnablePrefabs at runtime.");
-    }
+    Debug.Log($"Server loaded dataset from {fullPath} with dimensions {dimX}x{dimY}x{dimZ}");
 
     // Spawn on server
     ServerManager.Spawn(volumeGameObject);
@@ -287,29 +409,124 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
 
       volumeObject.dataset = dataset;
-      volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
-      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f)); // Adjusted for VisMale.raw range (1-254)
-      volumeObject.UpdateMaterialProperties(null);
-      Debug.Log($"Client assigned local dataset to networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Path={fullPath}");
 
       // Verify VolumeContainer
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer");
+      MeshRenderer meshRenderer = null;
       if (volumeContainer != null)
       {
-        MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
+        meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
         if (meshRenderer != null && meshRenderer.sharedMaterial != null)
         {
+          Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+          if (volumeShader != null && meshRenderer.sharedMaterial.shader != volumeShader)
+          {
+            Debug.LogWarning($"Client: VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected VolumeRendering/DirectVolumeRenderingShader. Updating material.");
+            meshRenderer.sharedMaterial = new Material(volumeShader);
+          }
           Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
         }
         else
         {
-          Debug.LogWarning("Client: VolumeContainer missing MeshRenderer or material!");
+          Debug.LogWarning("Client: VolumeContainer missing MeshRenderer or material! Creating material.");
+          meshRenderer = volumeContainer.gameObject.GetComponent<MeshRenderer>();
+          if (meshRenderer == null)
+          {
+            meshRenderer = volumeContainer.gameObject.AddComponent<MeshRenderer>();
+          }
+          Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+          if (volumeShader != null)
+          {
+            meshRenderer.material = new Material(volumeShader);
+            Debug.Log($"Client: Applied shader VolumeRendering/DirectVolumeRenderingShader.");
+          }
+          else
+          {
+            Debug.LogWarning("Client: Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
+            meshRenderer.material = new Material(Shader.Find("Standard"));
+          }
         }
       }
       else
       {
-        Debug.LogWarning("Client: VolumeContainer child not found in VolumeRenderedObject!");
+        Debug.LogWarning("Client: VolumeContainer child not found in VolumeRenderedObject! Creating manually.");
+        GameObject container = new GameObject("VolumeContainer");
+        container.transform.SetParent(volumeObject.transform, false);
+        container.transform.localPosition = Vector3.zero;
+        container.transform.localRotation = Quaternion.identity;
+        container.transform.localScale = Vector3.one;
+        MeshFilter meshFilter = container.AddComponent<MeshFilter>();
+        meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().mesh;
+        Destroy(GameObject.Find("Cube")); // Remove temporary cube
+        meshRenderer = container.AddComponent<MeshRenderer>();
+        Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+        if (volumeShader != null)
+        {
+          meshRenderer.material = new Material(volumeShader);
+          Debug.Log($"Client: Applied shader VolumeRendering/DirectVolumeRenderingShader.");
+        }
+        else
+        {
+          Debug.LogWarning("Client: Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
+          meshRenderer.material = new Material(Shader.Find("Standard"));
+        }
       }
+
+      // Set up material properties
+      if (meshRenderer != null && meshRenderer.sharedMaterial != null)
+      {
+        Texture3D dataTexture = dataset.GetDataTexture();
+        if (dataTexture != null)
+        {
+          meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
+          Debug.Log($"Client: Assigned dataset texture to material.");
+        }
+        else
+        {
+          Debug.LogWarning("Client: Failed to get dataset texture for VolumeContainer material.");
+        }
+
+        UnityVolumeRendering.TransferFunction tf = TransferFunctionDatabase.CreateTransferFunction();
+        volumeObject.transferFunction = tf;
+        Texture2D tfTexture = tf.GetTexture();
+        if (tfTexture != null)
+        {
+          meshRenderer.sharedMaterial.SetTexture("_TFTex", tfTexture);
+          Debug.Log($"Client: Assigned transfer function texture to material.");
+        }
+        else
+        {
+          Debug.LogWarning("Client: Failed to get transfer function texture.");
+        }
+
+        // Generate noise texture
+        const int noiseDimX = 512;
+        const int noiseDimY = 512;
+        Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
+        if (noiseTexture != null)
+        {
+          meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture);
+          Debug.Log($"Client: Assigned noise texture to material.");
+        }
+        else
+        {
+          Debug.LogWarning("Client: Failed to generate noise texture.");
+        }
+
+        // Set shader keywords
+        meshRenderer.sharedMaterial.EnableKeyword("MODE_DVR");
+        meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
+        meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
+
+        // Assign meshRenderer to VolumeRenderedObject
+        volumeObject.meshRenderer = meshRenderer;
+      }
+
+      volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
+      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f)); // Adjusted for VisMale.raw range (1-254)
+      volumeObject.UpdateMaterialProperties();
+
+      Debug.Log($"Client assigned local dataset to networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Path={fullPath}");
     }
     else
     {
@@ -319,6 +536,6 @@ public class VolumeDataNetworker : NetworkBehaviour
     // Ensure position, rotation, and scale
     volumeObject.transform.position = position ?? defaultPosition;
     volumeObject.transform.rotation = rotation ?? defaultRotation;
-    volumeObject.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f); // Adjust scale for visibility
+    volumeObject.transform.localScale = new Vector3(1f, 1f, 1f); // Adjust scale for visibility
   }
 }
