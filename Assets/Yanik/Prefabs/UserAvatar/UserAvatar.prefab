@@ -47,7 +47,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 2
+  _componentIndexCache: 3
   _addedNetworkObject: {fileID: 7851710499402613257}
   _networkObjectCache: {fileID: 7851710499402613257}
   _synchronizeParent: 0
@@ -121,7 +121,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e269b32501e58ec45a8196a2c8ce781c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 3
+  _componentIndexCache: 4
   _addedNetworkObject: {fileID: 7851710499402613257}
   _networkObjectCache: {fileID: 7851710499402613257}
   target: {fileID: 5278759054558933263}
@@ -187,10 +187,17 @@ MonoBehaviour:
   _networkBehaviours:
   - {fileID: 7562621471391547086}
   - {fileID: 4218619597045536751}
+  - {fileID: -3399695315769497911}
   - {fileID: 4684108599029529862}
   - {fileID: 4204874466464247169}
+  - {fileID: 8828077092818831133}
+  - {fileID: 5642084464128382845}
+  - {fileID: 6510856399001908033}
+  - {fileID: 766717967771281764}
   <ParentNetworkObject>k__BackingField: {fileID: 0}
-  <ChildNetworkObjects>k__BackingField: []
+  <ChildNetworkObjects>k__BackingField:
+  - {fileID: 7330936608232828677}
+  - {fileID: 2952801044854244973}
   _isNetworked: 1
   _isGlobal: 0
   _defaultDespawnType: 0
@@ -326,9 +333,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2aaecc057afee174d8db587928f20f0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 255
+  _componentIndexCache: 2
   _addedNetworkObject: {fileID: 7851710499402613257}
-  _networkObjectCache: {fileID: 0}
+  _networkObjectCache: {fileID: 7851710499402613257}
 --- !u!1 &5756476529238959460
 GameObject:
   m_ObjectHideFlags: 0
@@ -338,7 +345,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5222636022386307456}
+  - component: {fileID: 6510856399001908033}
   - component: {fileID: 2110539653000490335}
+  - component: {fileID: 766717967771281764}
   m_Layer: 0
   m_Name: Hand Right
   m_TagString: Untagged
@@ -362,6 +371,48 @@ Transform:
   - {fileID: 3130504207018324967}
   m_Father: {fileID: 3101693091994065199}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6510856399001908033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5756476529238959460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 7
+  _addedNetworkObject: {fileID: 7851710499402613257}
+  _networkObjectCache: {fileID: 7851710499402613257}
+  _synchronizeParent: 0
+  _packing:
+    Position: 0
+    Rotation: 0
+    Scale: 0
+  _interpolation: 2
+  _extrapolation: 2
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  _clientAuthoritative: 1
+  _sendToOwner: 1
+  _interval: 1
+  _synchronizePosition: 1
+  _positionSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeRotation: 1
+  _rotationSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeScale: 1
+  _scaleSnapping:
+    X: 0
+    Y: 0
+    Z: 0
 --- !u!114 &2110539653000490335
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -394,6 +445,28 @@ MonoBehaviour:
       position: {x: 0, y: 0, z: 0}
       rotation: {x: 0, y: 0, z: 0, w: 1}
   showSettings: 0
+--- !u!114 &766717967771281764
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5756476529238959460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e269b32501e58ec45a8196a2c8ce781c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 8
+  _addedNetworkObject: {fileID: 7851710499402613257}
+  _networkObjectCache: {fileID: 7851710499402613257}
+  target: {fileID: 5222636022386307456}
+  ownedOffset:
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0, w: 1}
+  unownedOffset:
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0, w: 1}
 --- !u!1 &7029214179620104856
 GameObject:
   m_ObjectHideFlags: 0
@@ -456,7 +529,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2453661687698013219}
+  - component: {fileID: 8828077092818831133}
   - component: {fileID: 2177276070995464776}
+  - component: {fileID: 5642084464128382845}
   m_Layer: 0
   m_Name: Hand Left
   m_TagString: Untagged
@@ -480,6 +555,48 @@ Transform:
   - {fileID: 4302447498667514497}
   m_Father: {fileID: 3101693091994065199}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8828077092818831133
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8841197448029332352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 5
+  _addedNetworkObject: {fileID: 7851710499402613257}
+  _networkObjectCache: {fileID: 7851710499402613257}
+  _synchronizeParent: 0
+  _packing:
+    Position: 0
+    Rotation: 0
+    Scale: 0
+  _interpolation: 2
+  _extrapolation: 2
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  _clientAuthoritative: 1
+  _sendToOwner: 1
+  _interval: 1
+  _synchronizePosition: 1
+  _positionSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeRotation: 1
+  _rotationSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeScale: 1
+  _scaleSnapping:
+    X: 0
+    Y: 0
+    Z: 0
 --- !u!114 &2177276070995464776
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -512,6 +629,28 @@ MonoBehaviour:
       position: {x: 0, y: 0, z: 0}
       rotation: {x: 0, y: 0, z: 0, w: 1}
   showSettings: 0
+--- !u!114 &5642084464128382845
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8841197448029332352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e269b32501e58ec45a8196a2c8ce781c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 6
+  _addedNetworkObject: {fileID: 7851710499402613257}
+  _networkObjectCache: {fileID: 7851710499402613257}
+  target: {fileID: 2453661687698013219}
+  ownedOffset:
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0, w: 1}
+  unownedOffset:
+    position: {x: 0, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0, w: 1}
 --- !u!1001 &4193299283809472252
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -583,6 +722,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 5068821511268711442}
+    - targetCorrespondingSourceObject: {fileID: 109434732395284509, guid: 65847589f926b734d9eaed6e25f0046b,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7330936608232828677}
   m_SourcePrefab: {fileID: 100100000, guid: 65847589f926b734d9eaed6e25f0046b, type: 3}
 --- !u!95 &4302447498658493783 stripped
 Animator:
@@ -614,6 +757,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6af088dbabec2734bb8b830361afa168, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 7851710499402613257}
+  _networkObjectCache: {fileID: 7330936608232828677}
   pinchAnimationAction:
     m_UseReference: 1
     m_Action:
@@ -649,6 +795,35 @@ MonoBehaviour:
     m_Reference: {fileID: -6131295136447488360, guid: ad97252fa702ca2418d1f94478290ebf,
       type: 3}
   handAnimator: {fileID: 4302447498658493783}
+  triggerValue: 0
+  gripValue: 0
+--- !u!114 &7330936608232828677
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4302447498668000993}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  <IsNested>k__BackingField: 1
+  <ComponentIndex>k__BackingField: 1
+  _networkBehaviours:
+  - {fileID: 5068821511268711442}
+  <ParentNetworkObject>k__BackingField: {fileID: 7851710499402613257}
+  <ChildNetworkObjects>k__BackingField: []
+  _isNetworked: 1
+  _isGlobal: 0
+  _defaultDespawnType: 0
+  NetworkObserver: {fileID: 0}
+  <PrefabId>k__BackingField: -1
+  _scenePathHash: 0
+  <SceneId>k__BackingField: 0
+  <AssetPathHash>k__BackingField: 0
+  _sceneNetworkObjects: []
 --- !u!1001 &4204923286936787616
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -819,6 +994,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 2221685530551698496}
+    - targetCorrespondingSourceObject: {fileID: 5686134208185362930, guid: 1fd3a7c43c8190f4d8c167ebde694364,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2952801044854244973}
   m_SourcePrefab: {fileID: 100100000, guid: 1fd3a7c43c8190f4d8c167ebde694364, type: 3}
 --- !u!4 &3130504207018324967 stripped
 Transform:
@@ -844,6 +1023,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6af088dbabec2734bb8b830361afa168, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 7851710499402613257}
+  _networkObjectCache: {fileID: 2952801044854244973}
   pinchAnimationAction:
     m_UseReference: 1
     m_Action:
@@ -871,6 +1053,35 @@ MonoBehaviour:
     m_Reference: {fileID: 187161793506945269, guid: ad97252fa702ca2418d1f94478290ebf,
       type: 3}
   handAnimator: {fileID: 3130504207026068529}
+  triggerValue: 0
+  gripValue: 0
+--- !u!114 &2952801044854244973
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3130504207018684295}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 26b716c41e9b56b4baafaf13a523ba2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  <IsNested>k__BackingField: 1
+  <ComponentIndex>k__BackingField: 2
+  _networkBehaviours:
+  - {fileID: 2221685530551698496}
+  <ParentNetworkObject>k__BackingField: {fileID: 7851710499402613257}
+  <ChildNetworkObjects>k__BackingField: []
+  _isNetworked: 1
+  _isGlobal: 0
+  _defaultDespawnType: 0
+  NetworkObserver: {fileID: 0}
+  <PrefabId>k__BackingField: -1
+  _scenePathHash: 0
+  <SceneId>k__BackingField: 0
+  <AssetPathHash>k__BackingField: 0
+  _sceneNetworkObjects: []
 --- !u!95 &3130504207026068529 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 5686134208192617028, guid: 1fd3a7c43c8190f4d8c167ebde694364,

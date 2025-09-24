@@ -71,6 +71,53 @@ namespace uMuVR
       }
       DisableOtherXRRigs();
     }
+    //protected virtual void OnInputSpawned(GameObject input)
+    //{
+    //  SyncPose[] syncPoses = input.GetComponentsInChildren<SyncPose>();
+    //  foreach (SyncPose sync in syncPoses)
+    //  {
+    //    if (sync.targetAvatar == null)
+    //    {
+    //      sync.targetAvatar = this;
+    //      sync.slot = sync.slot ?? "Head"; // Fallback to "Head" if unset
+    //      sync.mode = ISyncable.SyncMode.SyncTo; // XR Rig syncs to UserAvatar
+    //      Debug.Log($"Linked SyncPose on {sync.gameObject.name} to UserAvatar {ObjectId}, slot: {sync.slot}, mode: {sync.mode}");
+    //    }
+    //    else
+    //    {
+    //      Debug.Log($"SyncPose on {sync.gameObject.name} already linked to UserAvatar {sync.targetAvatar.ObjectId}, slot: {sync.slot}, mode: {sync.mode}");
+    //    }
+    //    if (sync.slot != "Head" && sync.slot != "LeftHand" && sync.slot != "RightHand")
+    //    {
+    //      Debug.LogWarning($"Invalid SyncPose slot {sync.slot} on {sync.gameObject.name}, expected Head, LeftHand, or RightHand");
+    //    }
+    //    if (sync.mode != ISyncable.SyncMode.SyncTo && sync.targetAvatar == this)
+    //    {
+    //      Debug.LogWarning($"SyncPose on {sync.gameObject.name} for UserAvatar {ObjectId} has incorrect mode {sync.mode}, setting to SyncTo");
+    //      sync.mode = ISyncable.SyncMode.SyncTo;
+    //    }
+    //  }
+
+    //  // Initialize NetworkObjects for hand models
+    //  var handAnimators = input.GetComponentsInChildren<AnimateHandOnInput>();
+    //  foreach (var handAnimator in handAnimators)
+    //  {
+    //    var networkObject = handAnimator.GetComponent<NetworkObject>();
+    //    if (networkObject == null)
+    //    {
+    //      Debug.LogWarning($"No NetworkObject on hand model {handAnimator.gameObject.name}, adding one");
+    //      networkObject = handAnimator.gameObject.AddComponent<NetworkObject>();
+    //    }
+    //    if (IsServer)
+    //    {
+    //      networkObject.Spawn();
+    //      networkObject.GiveOwnership(Owner);
+    //      Debug.Log($"Spawned NetworkObject for hand model {handAnimator.gameObject.name}, Owner={Owner.ClientId}");
+    //    }
+    //  }
+
+    //  DisableOtherXRRigs();
+    //}
 
     private bool shouldMaintainOwnership = false;
     private Coroutine ownershipCheckCoroutine;

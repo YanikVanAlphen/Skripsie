@@ -1367,7 +1367,7 @@ PrefabInstance:
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.data[1]
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1696469370}
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.data[2]
