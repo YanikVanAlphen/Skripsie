@@ -1836,7 +1836,7 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 2120035972}
   _networkObjectCache: {fileID: 2120035972}
-  datasetPath: Assets/DataFiles/VisMale.raw
+  datasetPath: Assets/EasyVolumeRenderingDataFiles/VisMale.raw
   defaultPosition: {x: 0, y: 0, z: 0}
   defaultRotation: {x: 0, y: 0, z: 0, w: 1}
 --- !u!4 &2120035974

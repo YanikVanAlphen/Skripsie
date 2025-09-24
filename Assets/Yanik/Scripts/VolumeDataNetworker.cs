@@ -8,7 +8,7 @@ using FishNet.Managing.Object; // for DefaultPrefabs
 
 public class VolumeDataNetworker : NetworkBehaviour
 {
-  [SerializeField] private string datasetPath = "Assets/DataFiles/VisMale.raw"; // For validation
+  [SerializeField] private string datasetPath = "Assets/EasyVolumeRendering/DataFiles/VisMale.raw"; // For validation
   [SerializeField] private Vector3 defaultPosition = Vector3.zero;
   [SerializeField] private Quaternion defaultRotation = Quaternion.identity;
 
