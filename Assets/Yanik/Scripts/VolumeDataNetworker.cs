@@ -11,6 +11,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   [SerializeField] private string datasetPath = "Assets/EasyVolumeRendering/DataFiles/VisMale.raw"; // For validation
   [SerializeField] private Vector3 defaultPosition = Vector3.zero;
   [SerializeField] private Quaternion defaultRotation = Quaternion.identity;
+  [SerializeField] private GameObject volumeRenderedObjectPrefab; // Assign VolumeRenderedObjectPrefab.prefab
 
   private VolumeRenderedObject volumeObject;
 
@@ -65,64 +66,66 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
     }
 
-    // Validate dataset path (optional, for PoC)
+    // Validate dataset path
     if (!string.IsNullOrEmpty(datasetPath) && volumeObject.dataset != null)
     {
       Debug.Log($"Found VolumeRenderedObject with dataset: {volumeObject.dataset.name}");
     }
 
-    // Add NetworkObject and NetworkTransform if missing
-    NetworkObject networkObject = volumeObject.GetComponent<NetworkObject>();
+    // Instantiate the prefab on the server
+    if (volumeRenderedObjectPrefab == null)
+    {
+      Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker!");
+      yield break;
+    }
+
+    GameObject networkedObj = Instantiate(volumeRenderedObjectPrefab, position ?? defaultPosition, rotation ?? defaultRotation);
+    NetworkObject networkObject = networkedObj.GetComponent<NetworkObject>();
     if (networkObject == null)
     {
-      networkObject = volumeObject.gameObject.AddComponent<NetworkObject>();
+      Debug.LogError("VolumeRenderedObjectPrefab missing NetworkObject component!");
+      Destroy(networkedObj);
+      yield break;
     }
 
-    if (volumeObject.GetComponent<FishNet.Component.Transforming.NetworkTransform>() == null)
+    // Add VolumeRenderedObject component if missing
+    if (networkedObj.GetComponent<VolumeRenderedObject>() == null)
     {
-      volumeObject.gameObject.AddComponent<FishNet.Component.Transforming.NetworkTransform>();
+      networkedObj.AddComponent<VolumeRenderedObject>();
     }
 
-    // Add VolumeSync for rendering settings
-    if (volumeObject.GetComponent<VolumeSync>() == null)
+    // Load dataset into the networked object
+    volumeObject = networkedObj.GetComponent<VolumeRenderedObject>();
+    if (volumeObject.dataset == null)
     {
-      volumeObject.gameObject.AddComponent<VolumeSync>();
-    }
-
-    // Add OwnershipManager for uMuVR compatibility
-    if (volumeObject.GetComponent<uMuVR.OwnershipManager>() == null)
-    {
-      volumeObject.gameObject.AddComponent<uMuVR.OwnershipManager>();
-    }
-
-    // Register the VolumeRenderedObject as a prefab at runtime
-    PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
-    bool isRegistered = false;
-    for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
-    {
-      if (prefabObjects.GetObject(true, i) == networkObject)
+      RawDatasetImporter importer = new RawDatasetImporter(datasetPath, 256, 256, 256, DataContentFormat.Uint8, Endianness.LittleEndian, 0);
+      VolumeDataset dataset = importer.Import();
+      if (dataset == null)
       {
-        isRegistered = true;
-        break;
+        Debug.LogError($"Server failed to import dataset from {datasetPath}");
+        Destroy(networkedObj);
+        yield break;
       }
+      volumeObject.dataset = dataset;
+      volumeObject.UpdateMaterialProperties(null);
     }
 
-    if (!isRegistered)
+    // Ensure NetworkTransform, VolumeSync, and OwnershipManager
+    if (networkedObj.GetComponent<FishNet.Component.Transforming.NetworkTransform>() == null)
     {
-      prefabObjects.AddObject(networkObject);
-      Debug.Log($"Registered VolumeRenderedObject as prefab with PrefabId={networkObject.PrefabId}");
+      networkedObj.AddComponent<FishNet.Component.Transforming.NetworkTransform>();
     }
-    else
+    if (networkedObj.GetComponent<VolumeSync>() == null)
     {
-      Debug.Log($"VolumeRenderedObject already registered as prefab with PrefabId={networkObject.PrefabId}");
+      networkedObj.AddComponent<VolumeSync>();
     }
-
-    // Set position and rotation
-    volumeObject.transform.position = position ?? defaultPosition;
-    volumeObject.transform.rotation = rotation ?? defaultRotation;
+    if (networkedObj.GetComponent<uMuVR.OwnershipManager>() == null)
+    {
+      networkedObj.AddComponent<uMuVR.OwnershipManager>();
+    }
 
     // Spawn on server
-    ServerManager.Spawn(networkObject.gameObject);
+    ServerManager.Spawn(networkedObj);
     Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={datasetPath}");
   }
 
@@ -131,7 +134,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     // Wait for server to spawn networked object
     NetworkObject networkObject = null;
     int retryCount = 0;
-    const int maxRetries = 20; // Wait up to 10 seconds (0.5s * 20)
+    const int maxRetries = 20; // Wait up to 10 seconds
     while (networkObject == null && retryCount < maxRetries)
     {
       networkObject = FindObjectsOfType<NetworkObject>().FirstOrDefault(nob => nob.GetComponent<VolumeRenderedObject>() != null);
@@ -159,7 +162,6 @@ public class VolumeDataNetworker : NetworkBehaviour
     // Load local dataset if not already loaded
     if (volumeObject.dataset == null)
     {
-      // Use RawDatasetImporter for RAW files
       RawDatasetImporter importer = new RawDatasetImporter(datasetPath ?? this.datasetPath, 256, 256, 256, DataContentFormat.Uint8, Endianness.LittleEndian, 0);
       VolumeDataset dataset = importer.Import();
       if (dataset == null)
