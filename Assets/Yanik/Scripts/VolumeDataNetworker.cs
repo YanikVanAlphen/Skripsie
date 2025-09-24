@@ -1,8 +1,10 @@
 using FishNet.Object;
 using FishNet.Connection;
-using FishNet.Component.Transforming;
+using FishNet.Component.Transforming; // for NetworkTransform
 using UnityEngine;
 using UnityVolumeRendering;
+using System.Linq; // for FirstOrDefault
+using FishNet.Managing.Object; // for DefaultPrefabs
 
 public class VolumeDataNetworker : NetworkBehaviour
 {
@@ -93,29 +95,65 @@ public class VolumeDataNetworker : NetworkBehaviour
       volumeObject.gameObject.AddComponent<uMuVR.OwnershipManager>();
     }
 
+    // Register the VolumeRenderedObject as a prefab at runtime
+    PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
+    bool isRegistered = false;
+    for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
+    {
+      if (prefabObjects.GetObject(true, i) == networkObject)
+      {
+        isRegistered = true;
+        break;
+      }
+    }
+
+    if (!isRegistered)
+    {
+      prefabObjects.AddObject(networkObject);
+      Debug.Log($"Registered VolumeRenderedObject as prefab with PrefabId={networkObject.PrefabId}");
+    }
+    else
+    {
+      Debug.Log($"VolumeRenderedObject already registered as prefab with PrefabId={networkObject.PrefabId}");
+    }
+
     // Set position and rotation
     volumeObject.transform.position = position ?? defaultPosition;
     volumeObject.transform.rotation = rotation ?? defaultRotation;
 
     // Spawn on server
-    ServerManager.Spawn(volumeObject.gameObject);
-    Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, Dataset={datasetPath}");
+    ServerManager.Spawn(networkObject.gameObject);
+    Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={datasetPath}");
   }
 
   private System.Collections.IEnumerator AssignLocalDataset(string datasetPath = null, Vector3? position = null, Quaternion? rotation = null)
   {
     // Wait for server to spawn networked object
     NetworkObject networkObject = null;
-    while (networkObject == null)
+    int retryCount = 0;
+    const int maxRetries = 20; // Wait up to 10 seconds (0.5s * 20)
+    while (networkObject == null && retryCount < maxRetries)
     {
-      networkObject = FindObjectOfType<NetworkObject>();
-      if (networkObject != null && networkObject.GetComponent<VolumeRenderedObject>() != null)
+      networkObject = FindObjectsOfType<NetworkObject>().FirstOrDefault(nob => nob.GetComponent<VolumeRenderedObject>() != null);
+      if (networkObject == null)
       {
-        volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
-        break;
+        Debug.Log("Client waiting for networked VolumeRenderedObject...");
+        retryCount++;
+        yield return new WaitForSeconds(0.5f);
       }
-      Debug.Log("Client waiting for networked VolumeRenderedObject...");
-      yield return new WaitForSeconds(0.5f);
+    }
+
+    if (networkObject == null)
+    {
+      Debug.LogError("Client failed to find networked VolumeRenderedObject after max retries.");
+      yield break;
+    }
+
+    volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
+    if (volumeObject == null)
+    {
+      Debug.LogError("NetworkObject found but missing VolumeRenderedObject component.");
+      yield break;
     }
 
     // Load local dataset if not already loaded
@@ -132,11 +170,11 @@ public class VolumeDataNetworker : NetworkBehaviour
 
       volumeObject.dataset = dataset;
       volumeObject.UpdateMaterialProperties(null);
-      Debug.Log($"Client assigned local dataset to networked object, ObjectId={networkObject.ObjectId}, Path={datasetPath}");
+      Debug.Log($"Client assigned local dataset to networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Path={datasetPath}");
     }
     else
     {
-      Debug.Log($"Client used existing dataset in networked object, ObjectId={networkObject.ObjectId}");
+      Debug.Log($"Client used existing dataset in networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
     }
 
     // Ensure position and rotation match

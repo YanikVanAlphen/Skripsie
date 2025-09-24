@@ -1356,7 +1356,7 @@ PrefabInstance:
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.size
-      value: 1
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
@@ -1367,7 +1367,7 @@ PrefabInstance:
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.data[1]
       value: 
-      objectReference: {fileID: 1696469370}
+      objectReference: {fileID: 2120035972}
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.data[2]
@@ -1806,7 +1806,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   <IsNested>k__BackingField: 0
   <ComponentIndex>k__BackingField: 0
-  _networkBehaviours: []
+  _networkBehaviours:
+  - {fileID: 2120035973}
   <ParentNetworkObject>k__BackingField: {fileID: 0}
   <ChildNetworkObjects>k__BackingField: []
   _isNetworked: 1
@@ -1818,8 +1819,8 @@ MonoBehaviour:
   <SceneId>k__BackingField: 161435889434369136
   <AssetPathHash>k__BackingField: 0
   _sceneNetworkObjects:
-  - {fileID: 2120035972}
   - {fileID: 1696469370}
+  - {fileID: 2120035972}
 --- !u!114 &2120035973
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1832,6 +1833,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 605ee93ad13dbdd47ab7ed5b26a75247, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 0
+  _addedNetworkObject: {fileID: 2120035972}
+  _networkObjectCache: {fileID: 2120035972}
+  datasetPath: Assets/DataFiles/VisMale.raw
+  defaultPosition: {x: 0, y: 0, z: 0}
+  defaultRotation: {x: 0, y: 0, z: 0, w: 1}
 --- !u!4 &2120035974
 Transform:
   m_ObjectHideFlags: 0
