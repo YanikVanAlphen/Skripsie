@@ -5,13 +5,14 @@ using UnityEngine;
 using UnityVolumeRendering;
 using System.Linq; // for FirstOrDefault
 using FishNet.Managing.Object; // for DefaultPrefabs
+using System.IO;
 
 public class VolumeDataNetworker : NetworkBehaviour
 {
-  [SerializeField] private string datasetPath = "Assets/EasyVolumeRendering/DataFiles/VisMale.raw"; // For validation
-  [SerializeField] private Vector3 defaultPosition = Vector3.zero;
+  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Relative to Assets (Editor) or StreamingAssets (build)
+  [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 1f, 2f); // In front of VR camera
   [SerializeField] private Quaternion defaultRotation = Quaternion.identity;
-  [SerializeField] private GameObject volumeRenderedObjectPrefab; // Assign VolumeRenderedObjectPrefab.prefab
+  [SerializeField] private GameObject volumeRenderedObjectPrefab; // Assign VolumeRenderedObjectPrefab.prefab (with NetworkObject, NetworkTransform, VolumeSync, OwnershipManager)
 
   private VolumeRenderedObject volumeObject;
 
@@ -19,7 +20,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   {
     if (IsServer)
     {
-      // Host scans for VolumeRenderedObject and networks it
+      // Host creates and networks VolumeRenderedObject
       StartCoroutine(NetworkVolumeObject());
     }
   }
@@ -55,78 +56,148 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private System.Collections.IEnumerator NetworkVolumeObject(Vector3? position = null, Quaternion? rotation = null)
   {
-    // Wait for VolumeRenderedObject to be created (e.g., via UI)
-    while (volumeObject == null)
-    {
-      volumeObject = FindObjectOfType<VolumeRenderedObject>();
-      if (volumeObject == null)
-      {
-        Debug.Log("Waiting for VolumeRenderedObject to be loaded...");
-        yield return new WaitForSeconds(0.5f);
-      }
-    }
-
-    // Validate dataset path
-    if (!string.IsNullOrEmpty(datasetPath) && volumeObject.dataset != null)
-    {
-      Debug.Log($"Found VolumeRenderedObject with dataset: {volumeObject.dataset.name}");
-    }
-
-    // Instantiate the prefab on the server
+    // Validate prefab
     if (volumeRenderedObjectPrefab == null)
     {
       Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker!");
       yield break;
     }
 
-    GameObject networkedObj = Instantiate(volumeRenderedObjectPrefab, position ?? defaultPosition, rotation ?? defaultRotation);
-    NetworkObject networkObject = networkedObj.GetComponent<NetworkObject>();
-    if (networkObject == null)
+    // Determine dataset path (Editor vs. build)
+    string fullPath;
+    if (Application.isEditor)
     {
-      Debug.LogError("VolumeRenderedObjectPrefab missing NetworkObject component!");
-      Destroy(networkedObj);
+      fullPath = Path.Combine(Application.dataPath, datasetPath);
+    }
+    else
+    {
+      fullPath = Path.Combine(Application.streamingAssetsPath, datasetPath);
+    }
+
+    // Validate dataset file
+    if (!File.Exists(fullPath))
+    {
+      Debug.LogError($"Dataset file not found at {fullPath}. Ensure VisMale.raw is in Assets/StreamingAssets/EasyVolumeRendering/DataFiles/ for builds.");
       yield break;
     }
 
-    // Add VolumeRenderedObject component if missing
-    if (networkedObj.GetComponent<VolumeRenderedObject>() == null)
+    // Check for .ini file
+    string iniPath = Path.ChangeExtension(fullPath, ".ini");
+    int dimX = 256, dimY = 256, dimZ = 128;
+    DataContentFormat format = DataContentFormat.Uint8;
+    Endianness endianness = Endianness.LittleEndian;
+    int bytesToSkip = 0;
+
+    if (File.Exists(iniPath))
     {
-      networkedObj.AddComponent<VolumeRenderedObject>();
+      try
+      {
+        string[] iniLines = File.ReadAllLines(iniPath);
+        foreach (string line in iniLines)
+        {
+          if (line.StartsWith("dimX=")) dimX = int.Parse(line.Split('=')[1]);
+          else if (line.StartsWith("dimY=")) dimY = int.Parse(line.Split('=')[1]);
+          else if (line.StartsWith("dimZ=")) dimZ = int.Parse(line.Split('=')[1]);
+          else if (line.StartsWith("format=")) format = (DataContentFormat)System.Enum.Parse(typeof(DataContentFormat), line.Split('=')[1]);
+          else if (line.StartsWith("endianness=")) endianness = (Endianness)System.Enum.Parse(typeof(Endianness), line.Split('=')[1]);
+          else if (line.StartsWith("skipBytes=")) bytesToSkip = int.Parse(line.Split('=')[1]);
+        }
+        Debug.Log($"Loaded .ini file parameters: dimX={dimX}, dimY={dimY}, dimZ={dimZ}, format={format}, endianness={endianness}, skipBytes={bytesToSkip}");
+      }
+      catch (System.Exception e)
+      {
+        Debug.LogWarning($"Failed to parse .ini file at {iniPath}: {e.Message}. Using default parameters.");
+      }
     }
 
-    // Load dataset into the networked object
-    volumeObject = networkedObj.GetComponent<VolumeRenderedObject>();
-    if (volumeObject.dataset == null)
+    // Load dataset
+    RawDatasetImporter importer = new RawDatasetImporter(fullPath, dimX, dimY, dimZ, format, endianness, bytesToSkip);
+    VolumeDataset dataset = importer.Import();
+    if (dataset == null)
     {
-      RawDatasetImporter importer = new RawDatasetImporter(datasetPath, 256, 256, 256, DataContentFormat.Uint8, Endianness.LittleEndian, 0);
-      VolumeDataset dataset = importer.Import();
-      if (dataset == null)
-      {
-        Debug.LogError($"Server failed to import dataset from {datasetPath}");
-        Destroy(networkedObj);
-        yield break;
-      }
-      volumeObject.dataset = dataset;
-      volumeObject.UpdateMaterialProperties(null);
+      Debug.LogError($"Server failed to import dataset from {fullPath}. Check dimensions ({dimX}x{dimY}x{dimZ}), format ({format}), endianness ({endianness}), and file size (8388608 bytes).");
+      yield break;
+    }
+
+    // Create VolumeRenderedObject using VolumeObjectFactory
+    VolumeRenderedObject volObj = VolumeObjectFactory.CreateObject(dataset);
+    GameObject volumeGameObject = volObj.gameObject;
+    volumeObject = volObj;
+    if (volumeObject == null)
+    {
+      Debug.LogError("VolumeObjectFactory failed to create VolumeRenderedObject!");
+      Destroy(volumeGameObject);
+      yield break;
+    }
+
+    // Set position, rotation, and scale
+    volumeGameObject.transform.position = position ?? defaultPosition;
+    volumeGameObject.transform.rotation = rotation ?? defaultRotation;
+    volumeGameObject.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f); // Adjust scale for visibility
+
+    // Add networking components
+    NetworkObject networkObject = volumeGameObject.GetComponent<NetworkObject>();
+    if (networkObject == null)
+    {
+      networkObject = volumeGameObject.AddComponent<NetworkObject>();
     }
 
     // Ensure NetworkTransform, VolumeSync, and OwnershipManager
-    if (networkedObj.GetComponent<FishNet.Component.Transforming.NetworkTransform>() == null)
+    if (volumeGameObject.GetComponent<FishNet.Component.Transforming.NetworkTransform>() == null)
     {
-      networkedObj.AddComponent<FishNet.Component.Transforming.NetworkTransform>();
+      volumeGameObject.AddComponent<FishNet.Component.Transforming.NetworkTransform>();
     }
-    if (networkedObj.GetComponent<VolumeSync>() == null)
+    if (volumeGameObject.GetComponent<VolumeSync>() == null)
     {
-      networkedObj.AddComponent<VolumeSync>();
+      volumeGameObject.AddComponent<VolumeSync>();
     }
-    if (networkedObj.GetComponent<uMuVR.OwnershipManager>() == null)
+    if (volumeGameObject.GetComponent<uMuVR.OwnershipManager>() == null)
     {
-      networkedObj.AddComponent<uMuVR.OwnershipManager>();
+      volumeGameObject.AddComponent<uMuVR.OwnershipManager>();
+    }
+
+    // Verify VolumeContainer
+    Transform volumeContainer = volumeGameObject.transform.Find("VolumeContainer");
+    if (volumeContainer != null)
+    {
+      MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
+      if (meshRenderer != null && meshRenderer.sharedMaterial != null)
+      {
+        Debug.Log($"VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
+      }
+      else
+      {
+        Debug.LogWarning("VolumeContainer missing MeshRenderer or material!");
+      }
+    }
+    else
+    {
+      Debug.LogWarning("VolumeContainer child not found in VolumeRenderedObject!");
+    }
+
+    // Set initial render settings
+    /*
+     * Rendering Options:
+     * RenderMode.DirectVolumeRendering
+     * RenderMode.MaximumIntensityProjectipon (plugin author type lol)
+     * RenderMode.IsosurfaceRendering
+     */
+    volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
+    volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f)); // Adjusted for VisMale.raw range (1-254)
+    volumeObject.UpdateMaterialProperties(null);
+    Debug.Log($"Server loaded dataset from {fullPath} with dimensions {dimX}x{dimY}x{dimZ}");
+
+    // Ensure prefab is registered
+    NetworkObject prefabNetworkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+    if (prefabNetworkObject != null)
+    {
+      NetworkManager.SpawnablePrefabs.AddObject(prefabNetworkObject);
+      Debug.Log("Registered VolumeRenderedObjectPrefab in SpawnablePrefabs at runtime.");
     }
 
     // Spawn on server
-    ServerManager.Spawn(networkedObj);
-    Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={datasetPath}");
+    ServerManager.Spawn(volumeGameObject);
+    Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={fullPath}");
   }
 
   private System.Collections.IEnumerator AssignLocalDataset(string datasetPath = null, Vector3? position = null, Quaternion? rotation = null)
@@ -134,7 +205,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     // Wait for server to spawn networked object
     NetworkObject networkObject = null;
     int retryCount = 0;
-    const int maxRetries = 20; // Wait up to 10 seconds
+    const int maxRetries = 60; // Wait up to 30 seconds
     while (networkObject == null && retryCount < maxRetries)
     {
       networkObject = FindObjectsOfType<NetworkObject>().FirstOrDefault(nob => nob.GetComponent<VolumeRenderedObject>() != null);
@@ -160,27 +231,94 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
 
     // Load local dataset if not already loaded
+    string fullPath;
+    if (Application.isEditor)
+    {
+      fullPath = Path.Combine(Application.dataPath, datasetPath ?? this.datasetPath);
+    }
+    else
+    {
+      fullPath = Path.Combine(Application.streamingAssetsPath, datasetPath ?? this.datasetPath);
+    }
+
+    if (!File.Exists(fullPath))
+    {
+      Debug.LogError($"Dataset file not found at {fullPath}. Ensure VisMale.raw is in Assets/StreamingAssets/EasyVolumeRendering/DataFiles/ for builds.");
+      yield break;
+    }
+
+    // Check for .ini file
+    string iniPath = Path.ChangeExtension(fullPath, ".ini");
+    int dimX = 256, dimY = 256, dimZ = 128;
+    DataContentFormat format = DataContentFormat.Uint8;
+    Endianness endianness = Endianness.LittleEndian;
+    int bytesToSkip = 0;
+
+    if (File.Exists(iniPath))
+    {
+      try
+      {
+        string[] iniLines = File.ReadAllLines(iniPath);
+        foreach (string line in iniLines)
+        {
+          if (line.StartsWith("dimX=")) dimX = int.Parse(line.Split('=')[1]);
+          else if (line.StartsWith("dimY=")) dimY = int.Parse(line.Split('=')[1]);
+          else if (line.StartsWith("dimZ=")) dimZ = int.Parse(line.Split('=')[1]);
+          else if (line.StartsWith("format=")) format = (DataContentFormat)System.Enum.Parse(typeof(DataContentFormat), line.Split('=')[1]);
+          else if (line.StartsWith("endianness=")) endianness = (Endianness)System.Enum.Parse(typeof(Endianness), line.Split('=')[1]);
+          else if (line.StartsWith("skipBytes=")) bytesToSkip = int.Parse(line.Split('=')[1]);
+        }
+        Debug.Log($"Client loaded .ini file parameters: dimX={dimX}, dimY={dimY}, dimZ={dimZ}, format={format}, endianness={endianness}, skipBytes={bytesToSkip}");
+      }
+      catch (System.Exception e)
+      {
+        Debug.LogWarning($"Client failed to parse .ini file at {iniPath}: {e.Message}. Using default parameters.");
+      }
+    }
+
     if (volumeObject.dataset == null)
     {
-      RawDatasetImporter importer = new RawDatasetImporter(datasetPath ?? this.datasetPath, 256, 256, 256, DataContentFormat.Uint8, Endianness.LittleEndian, 0);
+      RawDatasetImporter importer = new RawDatasetImporter(fullPath, dimX, dimY, dimZ, format, endianness, bytesToSkip);
       VolumeDataset dataset = importer.Import();
       if (dataset == null)
       {
-        Debug.LogError($"Client failed to import dataset from {datasetPath}");
+        Debug.LogError($"Client failed to import dataset from {fullPath}. Check dimensions ({dimX}x{dimY}x{dimZ}), format ({format}), endianness ({endianness}), and file size (8388608 bytes).");
         yield break;
       }
 
       volumeObject.dataset = dataset;
+      volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
+      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f)); // Adjusted for VisMale.raw range (1-254)
       volumeObject.UpdateMaterialProperties(null);
-      Debug.Log($"Client assigned local dataset to networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Path={datasetPath}");
+      Debug.Log($"Client assigned local dataset to networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Path={fullPath}");
+
+      // Verify VolumeContainer
+      Transform volumeContainer = volumeObject.transform.Find("VolumeContainer");
+      if (volumeContainer != null)
+      {
+        MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
+        if (meshRenderer != null && meshRenderer.sharedMaterial != null)
+        {
+          Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
+        }
+        else
+        {
+          Debug.LogWarning("Client: VolumeContainer missing MeshRenderer or material!");
+        }
+      }
+      else
+      {
+        Debug.LogWarning("Client: VolumeContainer child not found in VolumeRenderedObject!");
+      }
     }
     else
     {
       Debug.Log($"Client used existing dataset in networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
     }
 
-    // Ensure position and rotation match
+    // Ensure position, rotation, and scale
     volumeObject.transform.position = position ?? defaultPosition;
     volumeObject.transform.rotation = rotation ?? defaultRotation;
+    volumeObject.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f); // Adjust scale for visibility
   }
 }

@@ -2,118 +2,103 @@ using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using UnityEngine;
 using UnityVolumeRendering;
+using System.Collections;
 
 public class VolumeSync : NetworkBehaviour
 {
-  private VolumeRenderedObject volumeObject;
-
   [SyncVar(OnChange = nameof(OnRenderModeChanged))]
-  private UnityVolumeRendering.RenderMode renderMode;
-  [SyncVar(OnChange = nameof(OnVisibleRangeChanged))]
-  private Vector2 visibleValueRange;
-  [SyncVar(OnChange = nameof(OnLightingChanged))]
-  private bool enableLighting;
-  [SyncVar(OnChange = nameof(OnCubicInterpolationChanged))]
-  private bool enableCubicInterpolation;
+  private UnityVolumeRendering.RenderMode renderMode = UnityVolumeRendering.RenderMode.DirectVolumeRendering;
+
+  [SyncVar(OnChange = nameof(OnVisibilityWindowChanged))]
+  private Vector2 visibilityWindow = new Vector2(0.0f, 1.0f);
+
+  private VolumeRenderedObject volumeObject;
 
   private void Awake()
   {
-    volumeObject = GetComponent<VolumeRenderedObject>();
-    if (volumeObject == null)
+    // Defer initialization to coroutine to wait for VolumeRenderedObject
+    StartCoroutine(InitializeVolumeObject());
+  }
+
+  private IEnumerator InitializeVolumeObject()
+  {
+    // Wait for VolumeRenderedObject to be added
+    while (volumeObject == null)
     {
-      Debug.LogError($"No VolumeRenderedObject found on {gameObject.name}");
+      volumeObject = GetComponent<VolumeRenderedObject>();
+      if (volumeObject == null)
+      {
+        Debug.Log("Waiting for VolumeRenderedObject component...");
+        yield return new WaitForSeconds(0.5f);
+      }
+    }
+
+    Debug.Log("VolumeSync initialized with VolumeRenderedObject.");
+    // Apply initial settings
+    ApplyRenderSettings();
+  }
+
+  public void UpdateRenderMode(UnityVolumeRendering.RenderMode newMode)
+  {
+    if (IsServer)
+    {
+      renderMode = newMode;
+    }
+    else
+    {
+      CmdUpdateRenderMode(newMode);
     }
   }
 
-  public override void OnStartClient()
+  public void UpdateVisibleRange(Vector2 newRange)
   {
-    base.OnStartClient();
-    if (IsOwner)
+    if (IsServer)
     {
-      UpdateRenderSettings();
+      visibilityWindow = newRange;
+    }
+    else
+    {
+      CmdUpdateVisibleRange(newRange);
     }
   }
 
   [ServerRpc(RequireOwnership = false)]
-  public void UpdateRenderMode(UnityVolumeRendering.RenderMode mode)
+  private void CmdUpdateRenderMode(UnityVolumeRendering.RenderMode newMode)
   {
-    renderMode = mode;
+    renderMode = newMode;
   }
 
   [ServerRpc(RequireOwnership = false)]
-  public void UpdateVisibleRange(Vector2 range)
+  private void CmdUpdateVisibleRange(Vector2 newRange)
   {
-    visibleValueRange = range;
-  }
-
-  [ServerRpc(RequireOwnership = false)]
-  public void UpdateLighting(bool enabled)
-  {
-    enableLighting = enabled;
-  }
-
-  [ServerRpc(RequireOwnership = false)]
-  public void UpdateCubicInterpolation(bool enabled)
-  {
-    enableCubicInterpolation = enabled;
+    visibilityWindow = newRange;
   }
 
   private void OnRenderModeChanged(UnityVolumeRendering.RenderMode oldMode, UnityVolumeRendering.RenderMode newMode, bool asServer)
   {
-    if (volumeObject == null)
+    if (volumeObject != null)
     {
-      Debug.LogError($"VolumeRenderedObject is null on {gameObject.name} during render mode change");
-      return;
+      volumeObject.SetRenderMode(newMode);
+      Debug.Log($"Render mode updated to {newMode} on {(asServer ? "server" : "client")}.");
     }
-    volumeObject.SetRenderMode(newMode);
-    Debug.Log($"Updated render mode for {gameObject.name} to {newMode}");
   }
 
-  private void OnVisibleRangeChanged(Vector2 oldRange, Vector2 newRange, bool asServer)
-  {
-    if (volumeObject == null)
-    {
-      Debug.LogError($"VolumeRenderedObject is null on {gameObject.name} during visible range change");
-      return;
-    }
-    volumeObject.SetVisibilityWindow(newRange.x, newRange.y);
-    Debug.Log($"Updated visible range for {gameObject.name} to {newRange}");
-  }
-
-  private void OnLightingChanged(bool oldValue, bool newValue, bool asServer)
-  {
-    if (volumeObject == null)
-    {
-      Debug.LogError($"VolumeRenderedObject is null on {gameObject.name} during lighting change");
-      return;
-    }
-    volumeObject.SetLightingEnabled(newValue);
-    Debug.Log($"Updated lighting for {gameObject.name} to {newValue}");
-  }
-
-  private void OnCubicInterpolationChanged(bool oldValue, bool newValue, bool asServer)
-  {
-    if (volumeObject == null)
-    {
-      Debug.LogError($"VolumeRenderedObject is null on {gameObject.name} during cubic interpolation change");
-      return;
-    }
-    volumeObject.SetCubicInterpolationEnabled(newValue);
-    Debug.Log($"Updated cubic interpolation for {gameObject.name} to {newValue}");
-  }
-
-  public void UpdateRenderSettings()
+  private void OnVisibilityWindowChanged(Vector2 oldRange, Vector2 newRange, bool asServer)
   {
     if (volumeObject != null)
     {
-      UpdateRenderMode(volumeObject.GetRenderMode());
-      UpdateVisibleRange(new Vector2(volumeObject.GetVisibilityWindow().x, volumeObject.GetVisibilityWindow().y));
-      UpdateLighting(volumeObject.GetLightingEnabled());
-      UpdateCubicInterpolation(volumeObject.GetCubicInterpolationEnabled());
+      volumeObject.SetVisibilityWindow(newRange);
+      Debug.Log($"Visibility window updated to {newRange} on {(asServer ? "server" : "client")}.");
     }
-    else
+  }
+
+  private void ApplyRenderSettings()
+  {
+    if (volumeObject != null)
     {
-      Debug.LogWarning($"Cannot update render settings; VolumeRenderedObject is null on {gameObject.name}");
+      volumeObject.SetRenderMode(renderMode);
+      volumeObject.SetVisibilityWindow(visibilityWindow);
+      Debug.Log("Applied initial render settings.");
     }
   }
 }
