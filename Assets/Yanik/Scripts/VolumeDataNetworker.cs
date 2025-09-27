@@ -6,6 +6,7 @@ using UnityVolumeRendering;
 using System.Linq; // for FirstOrDefault
 using FishNet.Managing.Object; // for DefaultPrefabs
 using System.IO;
+using System;
 
 /* RENDERING OPTIONS:
      * RenderMode.DirectVolumeRendering
@@ -26,7 +27,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   private void Start()
   {
     // Register prefab at start
-    RegisterPrefab();
+    //RegisterPrefab();
     if (IsServer)
     {
       // Host creates and networks VolumeRenderedObject
@@ -202,7 +203,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
     // Normalize scale (mimicking VolumeObjectFactory)
     float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-    volumeGameObject.transform.localScale = Vector3.one / maxScale * 0.1f; // Adjust for visibility
+    volumeGameObject.transform.localScale = Vector3.one / maxScale; // Adjust for visibility
     volumeGameObject.transform.position = position ?? defaultPosition;
     volumeGameObject.transform.rotation = rotation ?? defaultRotation;
 
@@ -353,15 +354,14 @@ public class VolumeDataNetworker : NetworkBehaviour
       while (networkObject == null && retryCount < maxRetries)
       {
         NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
-        networkObject = networkObjects.FirstOrDefault(nob =>
-            nob.transform.Find("VolumeContainer") != null ||
-            nob.GetComponent<NetworkTransform>() != null);
+        int expectedPrefabId = volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId;
+        networkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId);
         if (networkObject == null)
         {
-          Debug.Log($"Client waiting for networked VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}. Found {networkObjects.Length} NetworkObjects. Expected PrefabId={volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId}, datasetPath={datasetPath}");
+          Debug.Log($"Client waiting for networked VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}. Found {networkObjects.Length} NetworkObjects. Expected PrefabId={expectedPrefabId}, datasetPath={datasetPath}");
           foreach (NetworkObject nob in networkObjects)
           {
-            Debug.Log($"Client: Found NetworkObject - ObjectId={nob.ObjectId}, PrefabId={nob.PrefabId}, Name={nob.gameObject.name}, HasVolumeContainer={nob.transform.Find("VolumeContainer") != null}, HasNetworkTransform={nob.GetComponent<NetworkTransform>() != null}");
+            Debug.Log($"Client: Found NetworkObject - ObjectId={nob.ObjectId}, PrefabId={nob.PrefabId}, Name={nob.gameObject.name}, HasVolumeContainer={nob.transform.Find("VolumeContainer") != null}, HasNetworkTransform={nob.GetComponent<NetworkTransform>() != null}, HasMeshRenderer={nob.GetComponentInChildren<MeshRenderer>() != null}, HasVolumeRenderedObject={nob.GetComponent<VolumeRenderedObject>() != null}");
           }
           retryCount++;
           yield return new WaitForSeconds(0.5f);
@@ -371,25 +371,22 @@ public class VolumeDataNetworker : NetworkBehaviour
           volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
           if (volumeObject == null)
           {
-            Debug.LogWarning($"Client: VolumeRenderedObject component missing on spawned NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Adding component.");
-            try
-            {
-              volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
-              Debug.Log($"Client: Successfully added VolumeRenderedObject component to ObjectId={networkObject.ObjectId}, GameObject={networkObject.gameObject.name}");
-            }
-            catch (System.Exception e)
-            {
-              Debug.LogError($"Client: Failed to add VolumeRenderedObject component to ObjectId={networkObject.ObjectId}. Error: {e.Message}");
-              yield break;
-            }
+            Debug.LogError($"Client: VolumeRenderedObject component missing on correct NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Ensure the prefab has this component attached on both host and client.");
+            yield break;
           }
-          Debug.Log($"Client found NetworkObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}, HasVolumeRenderedObject={volumeObject != null}, HasVolumeContainer={networkObject.transform.Find("VolumeContainer") != null}");
+          Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
+          if (volumeContainer == null)
+          {
+            Debug.LogError($"Client: VolumeContainer child missing on correct NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Ensure the prefab has VolumeContainer child attached on both host and client.");
+            yield break;
+          }
+          Debug.Log($"Client found correct NetworkObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}, HasVolumeRenderedObject={volumeObject != null}, HasVolumeContainer={volumeContainer != null}, HasMeshRenderer={networkObject.GetComponentInChildren<MeshRenderer>() != null}");
         }
       }
 
       if (networkObject == null || volumeObject == null)
       {
-        Debug.LogError($"Client failed to find or initialize networked VolumeRenderedObject after {maxRetries} retries. Expected PrefabId={volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId}, datasetPath={datasetPath}. Ensure prefab is registered in NetworkManager and server is spawning correctly.");
+        Debug.LogError($"Client failed to find or initialize networked VolumeRenderedObject after {maxRetries} retries. Expected PrefabId={volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId}, datasetPath={datasetPath}. Ensure prefab is added to NetworkManager's SpawnablePrefabs in editor on both host and client with matching PrefabId (set manually to 100 in NetworkObject component if needed).");
         yield break;
       }
     }
@@ -405,6 +402,12 @@ public class VolumeDataNetworker : NetworkBehaviour
       if (networkObject == null)
       {
         Debug.LogError("Server: VolumeRenderedObject missing NetworkObject component.");
+        yield break;
+      }
+      Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
+      if (volumeContainer == null)
+      {
+        Debug.LogError($"Server: VolumeContainer child missing on VolumeRenderedObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}). Ensure the prefab has VolumeContainer child attached.");
         yield break;
       }
     }
@@ -428,7 +431,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
     // Check for .ini file
     string iniPath = Path.ChangeExtension(fullPath, ".ini");
-    int dimX = 256, dimY = 256, dimZ = 128;
+    int dimX = 128, dimY = 256, dimZ = 256;
     DataContentFormat format = DataContentFormat.Uint8;
     Endianness endianness = Endianness.LittleEndian;
     int bytesToSkip = 0;
@@ -443,13 +446,13 @@ public class VolumeDataNetworker : NetworkBehaviour
           if (line.StartsWith("dimX=")) dimX = int.Parse(line.Split('=')[1]);
           else if (line.StartsWith("dimY=")) dimY = int.Parse(line.Split('=')[1]);
           else if (line.StartsWith("dimZ=")) dimZ = int.Parse(line.Split('=')[1]);
-          else if (line.StartsWith("format=")) format = (DataContentFormat)System.Enum.Parse(typeof(DataContentFormat), line.Split('=')[1]);
-          else if (line.StartsWith("endianness=")) endianness = (Endianness)System.Enum.Parse(typeof(Endianness), line.Split('=')[1]);
+          else if (line.StartsWith("format=")) format = (DataContentFormat)Enum.Parse(typeof(DataContentFormat), line.Split('=')[1]);
+          else if (line.StartsWith("endianness=")) endianness = (Endianness)Enum.Parse(typeof(Endianness), line.Split('=')[1]);
           else if (line.StartsWith("skipBytes=")) bytesToSkip = int.Parse(line.Split('=')[1]);
         }
         Debug.Log($"Client loaded .ini file parameters: dimX={dimX}, dimY={dimY}, dimZ={dimZ}, format={format}, endianness={endianness}, skipBytes={bytesToSkip}");
       }
-      catch (System.Exception e)
+      catch (Exception e)
       {
         Debug.LogWarning($"Client failed to parse .ini file at {iniPath}: {e.Message}. Using default parameters.");
       }
@@ -469,7 +472,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
       // Normalize scale
       float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-      volumeObject.transform.localScale = Vector3.one / maxScale * 0.1f;
+      volumeObject.transform.localScale = Vector3.one / maxScale;
 
       // Verify VolumeContainer
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer");
@@ -489,48 +492,14 @@ public class VolumeDataNetworker : NetworkBehaviour
         }
         else
         {
-          Debug.LogWarning("Client: VolumeContainer missing MeshRenderer or material! Creating material.");
-          meshRenderer = volumeContainer.gameObject.GetComponent<MeshRenderer>();
-          if (meshRenderer == null)
-          {
-            meshRenderer = volumeContainer.gameObject.AddComponent<MeshRenderer>();
-          }
-          Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
-          if (volumeShader != null)
-          {
-            meshRenderer.material = new Material(volumeShader);
-            Debug.Log($"Client: Applied shader VolumeRendering/DirectVolumeRenderingShader.");
-          }
-          else
-          {
-            Debug.LogWarning("Client: Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
-            meshRenderer.material = new Material(Shader.Find("Standard"));
-          }
+          Debug.LogError($"Client: VolumeContainer missing MeshRenderer or material on NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}). Ensure prefab has VolumeContainer with MeshRenderer and material set.");
+          yield break;
         }
       }
       else
       {
-        Debug.LogWarning("Client: VolumeContainer child not found in VolumeRenderedObject! Creating manually.");
-        GameObject container = new GameObject("VolumeContainer");
-        container.transform.SetParent(volumeObject.transform, false);
-        container.transform.localPosition = Vector3.zero;
-        container.transform.localRotation = Quaternion.identity;
-        container.transform.localScale = Vector3.one;
-        MeshFilter meshFilter = container.AddComponent<MeshFilter>();
-        meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().mesh;
-        Destroy(GameObject.Find("Cube")); // Remove temporary cube
-        meshRenderer = container.AddComponent<MeshRenderer>();
-        Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
-        if (volumeShader != null)
-        {
-          meshRenderer.material = new Material(volumeShader);
-          Debug.Log($"Client: Applied shader VolumeRendering/DirectVolumeRenderingShader.");
-        }
-        else
-        {
-          Debug.LogWarning("Client: Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
-          meshRenderer.material = new Material(Shader.Find("Standard"));
-        }
+        Debug.LogError($"Client: VolumeContainer child not found in VolumeRenderedObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}). Ensure prefab has VolumeContainer child attached.");
+        yield break;
       }
 
       // Set up material properties
