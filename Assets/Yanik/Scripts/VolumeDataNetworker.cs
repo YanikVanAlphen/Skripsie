@@ -342,32 +342,50 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private System.Collections.IEnumerator AssignLocalDataset(string datasetPath = null, Vector3? position = null, Quaternion? rotation = null)
   {
-    // Wait for server to spawn networked object
     NetworkObject networkObject = null;
-    int retryCount = 0;
-    const int maxRetries = 60; // Wait up to 30 seconds
-    while (networkObject == null && retryCount < maxRetries)
+    volumeObject = null;
+
+    // Wait for server to spawn networked object
+    if (!IsServer)
     {
-      networkObject = FindObjectsOfType<NetworkObject>().FirstOrDefault(nob => nob.GetComponent<VolumeRenderedObject>() != null);
-      if (networkObject == null)
+      int retryCount = 0;
+      const int maxRetries = 60; // Wait up to 30 seconds
+      while (networkObject == null && retryCount < maxRetries)
       {
-        Debug.Log("Client waiting for networked VolumeRenderedObject...");
-        retryCount++;
-        yield return new WaitForSeconds(0.5f);
+        networkObject = FindObjectsOfType<NetworkObject>().FirstOrDefault(nob => nob.GetComponent<VolumeRenderedObject>() != null);
+        if (networkObject == null)
+        {
+          Debug.Log($"Client waiting for networked VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}. Found {FindObjectsOfType<NetworkObject>().Length} NetworkObjects.");
+          retryCount++;
+          yield return new WaitForSeconds(0.5f);
+        }
+        else
+        {
+          volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
+          Debug.Log($"Client found VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
+        }
+      }
+
+      if (networkObject == null || volumeObject == null)
+      {
+        Debug.LogError($"Client failed to find networked VolumeRenderedObject after {maxRetries} retries. Ensure prefab is registered in NetworkManager and server is spawning correctly.");
+        yield break;
       }
     }
-
-    if (networkObject == null)
+    else
     {
-      Debug.LogError("Client failed to find networked VolumeRenderedObject after max retries.");
-      yield break;
-    }
-
-    volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
-    if (volumeObject == null)
-    {
-      Debug.LogError("NetworkObject found but missing VolumeRenderedObject component.");
-      yield break;
+      // For server, volumeObject should already be set in NetworkVolumeObject
+      if (volumeObject == null)
+      {
+        Debug.LogError("Server: VolumeRenderedObject not set before AssignLocalDataset.");
+        yield break;
+      }
+      networkObject = volumeObject.GetComponent<NetworkObject>();
+      if (networkObject == null)
+      {
+        Debug.LogError("Server: VolumeRenderedObject missing NetworkObject component.");
+        yield break;
+      }
     }
 
     // Load local dataset if not already loaded
@@ -446,7 +464,7 @@ public class VolumeDataNetworker : NetworkBehaviour
             Debug.LogWarning($"Client: VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected VolumeRendering/DirectVolumeRenderingShader. Updating material.");
             meshRenderer.sharedMaterial = new Material(volumeShader);
           }
-          Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
+          Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}, Material name: {meshRenderer.sharedMaterial.name}");
         }
         else
         {
