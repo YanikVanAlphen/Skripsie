@@ -279,34 +279,14 @@ GameObject:
   m_Component:
   - component: {fileID: 212064668}
   - component: {fileID: 212064667}
-  - component: {fileID: 212064666}
-  m_Layer: 0
+  - component: {fileID: 212064669}
+  m_Layer: 5
   m_Name: EventSystem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &212064666
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 212064665}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_SendPointerHoverToParent: 1
-  m_HorizontalAxis: Horizontal
-  m_VerticalAxis: Vertical
-  m_SubmitButton: Submit
-  m_CancelButton: Cancel
-  m_InputActionsPerSecond: 10
-  m_RepeatDelay: 0.5
-  m_ForceModuleActive: 0
 --- !u!114 &212064667
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -337,6 +317,54 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &212064669
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 212064665}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab68ce6587aab0146b8dabefbd806791, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_SendPointerHoverToParent: 1
+  m_ClickSpeed: 0.3
+  m_MoveDeadzone: 0.6
+  m_RepeatDelay: 0.5
+  m_RepeatRate: 0.1
+  m_TrackedDeviceDragThresholdMultiplier: 1.4
+  m_TrackedScrollDeltaMultiplier: 5
+  m_BypassUIToolkitEvents: 0
+  m_ActiveInputMode: 1
+  m_MaxTrackedDeviceRaycastDistance: 1000
+  m_EnableXRInput: 1
+  m_EnableMouseInput: 1
+  m_EnableTouchInput: 1
+  m_PointAction: {fileID: 2869410428622933342, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_LeftClickAction: {fileID: 1855836014308820768, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_MiddleClickAction: {fileID: -6289560987278519447, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_RightClickAction: {fileID: -2562941478296515153, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_ScrollWheelAction: {fileID: 5825226938762934180, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_NavigateAction: {fileID: -7967456002180160679, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_SubmitAction: {fileID: 3994978066732806534, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_CancelAction: {fileID: 2387711382375263438, guid: ad97252fa702ca2418d1f94478290ebf,
+    type: 3}
+  m_EnableBuiltinActionsAsFallback: 1
+  m_EnableGamepadInput: 1
+  m_EnableJoystickInput: 1
+  m_HorizontalAxis: Horizontal
+  m_VerticalAxis: Vertical
+  m_SubmitButton: Submit
+  m_CancelButton: Cancel
 --- !u!1 &327308658
 GameObject:
   m_ObjectHideFlags: 0
@@ -1424,18 +1452,18 @@ PrefabInstance:
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.size
-      value: 2
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.data[0]
       value: 
-      objectReference: {fileID: 1696469370}
+      objectReference: {fileID: 0}
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.data[1]
       value: 
-      objectReference: {fileID: 2120035972}
+      objectReference: {fileID: 1696469370}
     - target: {fileID: 401565611632798332, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: _sceneNetworkObjects.Array.data[2]
@@ -1571,6 +1599,16 @@ PrefabInstance:
     - target: {fileID: 5192306327652594864, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: autoStartType
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5192306327652594895, guid: 7328e618e8dc5f84987e09f5e751e875,
+        type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5192306327652594899, guid: 7328e618e8dc5f84987e09f5e751e875,
+        type: 3}
+      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7272068948753492980, guid: 7328e618e8dc5f84987e09f5e751e875,
@@ -1887,6 +1925,7 @@ MonoBehaviour:
   <SceneId>k__BackingField: 161435889434369136
   <AssetPathHash>k__BackingField: 0
   _sceneNetworkObjects:
+  - {fileID: 0}
   - {fileID: 1696469370}
   - {fileID: 2120035972}
 --- !u!114 &2120035973

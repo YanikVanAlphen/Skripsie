@@ -28,8 +28,10 @@ public class VolumeDataNetworker : NetworkBehaviour
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
   [SerializeField] private GameObject volumeRenderedObjectPrefab;
+  [SerializeField] private GameObject volumeControlCanvasPrefab;
 
   private VolumeRenderedObject volumeObject;
+  private GameObject canvasObject;
   private bool isVolumeSpawned;
   private string DVRShaderName = "VolumeRendering/DirectVolumeRenderingShader";
 
@@ -384,6 +386,45 @@ public class VolumeDataNetworker : NetworkBehaviour
     ServerManager.Spawn(volumeGameObject);
     isVolumeSpawned = true;
     Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={fullPath}");
+
+    // Wait to ensure volume is networked
+    yield return new WaitForSeconds(0.1f);
+
+    // Spawn canvas
+    if (isCanvasSpawned)
+    {
+      Debug.LogWarning("Canvas already spawned on server, skipping canvas spawning.");
+    }
+    else
+    {
+      if (volumeControlCanvasPrefab == null)
+      {
+        Debug.LogError("VolumeControlCanvasPrefab not assigned in VolumeDataNetworker!");
+        yield break;
+      }
+
+      canvasObject = Instantiate(volumeControlCanvasPrefab, new Vector3(0f, 1.5f, 3.2f), Quaternion.Euler(0f, 0f, 0f));
+      NetworkObject canvasNetworkObject = canvasObject.GetComponent<NetworkObject>();
+      if (canvasNetworkObject == null)
+      {
+        Debug.LogError("Instantiated VolumeControlCanvasPrefab missing NetworkObject.");
+        Destroy(canvasObject);
+        yield break;
+      }
+
+      VolumeControlUI controlUI = canvasObject.GetComponent<VolumeControlUI>();
+      if (controlUI == null)
+      {
+        Debug.LogError("VolumeControlCanvasPrefab missing VolumeControlUI component.");
+        Destroy(canvasObject);
+        yield break;
+      }
+
+      controlUI.SetVolumeDataNetworker(this);
+      ServerManager.Spawn(canvasObject);
+      isCanvasSpawned = true;
+      Debug.Log($"Server spawned VolumeControlCanvas, ObjectId={canvasNetworkObject.ObjectId}, PrefabId={canvasNetworkObject.PrefabId}");
+    }
   }
 
   /// <summary>
