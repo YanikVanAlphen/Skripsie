@@ -1,10 +1,10 @@
 using FishNet.Object;
 using FishNet.Connection;
-using FishNet.Component.Transforming; // for NetworkTransform
+using FishNet.Component.Transforming;
 using UnityEngine;
 using UnityVolumeRendering;
-using System.Linq; // for FirstOrDefault
-using FishNet.Managing.Object; // for DefaultPrefabs
+using System.Linq;
+using FishNet.Managing.Object;
 using System.IO;
 using System;
 
@@ -14,23 +14,36 @@ using System;
      * RenderMode.IsosurfaceRendering
      */
 
+/// <summary>
+/// Manages the networking of a volumetric dataset by spawning a VolumeRenderedObject on the server.
+/// Clients are notified to load the same dataset. Also ensures that the volume is rendered correctly with synchronised potisiton/rotation/scale.
+/// Inherits from NetworkBehaviour, allowign client-server Remote Procedure Call (RPC)s and management of networked GameObjects.
+/// Uses UnityVolumeRendering (https://github.com/mlavik1/UnityVolumeRendering.git) for dataset loading and rendering.
+/// </summary>
+/// <param</param>
+/// <returns></returns>
 public class VolumeDataNetworker : NetworkBehaviour
 {
-  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Relative to Assets (Editor) or StreamingAssets (build)
-  [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 3f, 0f); // In front of VR camera
-  [SerializeField] private Quaternion defaultRotation = Quaternion.identity;
-  [SerializeField] private GameObject volumeRenderedObjectPrefab; // Assign VolumeRenderedObjectPrefab.prefab (with NetworkObject, NetworkTransform, VolumeSync, OwnershipManager, VolumeRenderedObject, VolumeContainer)
+  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Relative to Assets (running from editor) or StreamingAssets folder in build version
+  [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
+  [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
+  [SerializeField] private GameObject volumeRenderedObjectPrefab;
 
   private VolumeRenderedObject volumeObject;
-  private bool isVolumeSpawned; // Track if volume is already spawned
+  private bool isVolumeSpawned;
+  private string DVRShaderName = "VolumeRendering/DirectVolumeRenderingShader";
 
+  /// <summary>
+  /// Called automatically by Unity on program start. 
+  /// Init volume rendering process on the server when the script starts.
+  /// </summary>
+  /// <param</param>
+  /// <returns></returns>
   private void Start()
   {
-    // Register prefab at start
-    //RegisterPrefab();
     if (IsServer)
     {
-      // Host creates and networks VolumeRenderedObject
+      // Host: create and network VolumeRenderedObject
       if (!isVolumeSpawned)
       {
         StartCoroutine(NetworkVolumeObject());
@@ -38,21 +51,31 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
+  /// <summary>
+  /// Handles client init, triggered when a Client joins the Host session.
+  /// </summary>
+  /// <param</param>
+  /// <returns></returns>
   public override void OnStartClient()
   {
     base.OnStartClient();
     if (!IsServer)
     {
-      // Client assigns local dataset to networked object
+      // Client: assign local dataset to networked object
       RequestCurrentDatasetServerRpc(NetworkManager.ClientManager.Connection);
     }
   }
 
+  /// <summary>
+  /// Registers volumeRenderedObject prefab with the NetworkManager to allow networked spawning -- DEPRECATED
+  /// </summary>
+  /// <param</param>
+  /// <returns></returns>
   private void RegisterPrefab()
   {
     if (volumeRenderedObjectPrefab == null)
     {
-      Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker!");
+      Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker.");
       return;
     }
 
@@ -73,7 +96,7 @@ public class VolumeDataNetworker : NetworkBehaviour
       if (!isRegistered)
       {
         prefabObjects.AddObject(prefabNetworkObject);
-        Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId} in SpawnablePrefabs.");
+        Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId} in NetworkManager SpawnablePrefabs.");
       }
       else
       {
@@ -82,10 +105,18 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
     else
     {
-      Debug.LogError("VolumeRenderedObjectPrefab missing NetworkObject component!");
+      Debug.LogError("VolumeRenderedObjectPrefab missing NetworkObject component.");
     }
   }
 
+  /// <summary>
+  /// Server RPC to request loading a new dataset + update the networked volumetric object. -- Not currently used
+  /// </summary>
+  /// <param name="newDatasetPath">(string): Path to the new dataset.</param>
+  /// <param name="position">(Vector3): Desired position for the volume.</param>
+  /// <param name="rotation">(Quaternion): Desired rotation for the volume.</param>
+  /// <param name="conn">(NetworkConnection, optional): Specific client connection (null for all clients).</param>
+  /// <returns></returns>
   [ServerRpc(RequireOwnership = false)]
   public void RequestLoadVolumeData(string newDatasetPath, Vector3 position, Quaternion rotation, NetworkConnection conn = null)
   {
@@ -102,16 +133,29 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
+  /// <summary>
+  /// Target RPC sent from server to a specific client to load the dataset and synchronize the volume.
+  /// </summary>
+  /// <param name="conn">(NetworkConnection): Target client’s connection.</param>
+  /// <param name="datasetPath">(string): Path to the dataset to load.</param>
+  /// <param name="position">(Vector3): Volume position.</param>
+  /// <param name="rotation">(Quaternion): Volume rotation.</param>
+  /// <returns></returns>
   [TargetRpc]
   private void TargetAssignLocalDataset(NetworkConnection conn, string datasetPath, Vector3 position, Quaternion rotation)
   {
     StartCoroutine(AssignLocalDataset(datasetPath, position, rotation));
   }
 
+  /// <summary>
+  /// Instantiate, configure, and spawn the VolumeRenderedObject on the server.
+  /// </summary>
+  /// <param name="position">(Vector3? -> nullable): Optional position. Defaults to defaultPosition.</param>
+  /// <param name="rotation">(Quaternion? -> nullable): Optional rotation. Defaults to defaultRotation.</param>
+  /// <returns></returns>
   private System.Collections.IEnumerator NetworkVolumeObject(Vector3? position = null, Quaternion? rotation = null)
   {
-    // Prevent multiple spawns
-    if (isVolumeSpawned)
+    if (isVolumeSpawned) // To prevent multiple spawns
     {
       Debug.LogWarning("Volume already spawned on server, skipping NetworkVolumeObject.");
       yield break;
@@ -127,14 +171,14 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
     }
 
-    // Validate prefab
+    // Check prefab
     if (volumeRenderedObjectPrefab == null)
     {
       Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker!");
       yield break;
     }
 
-    // Determine dataset path (Editor vs. build)
+    // Determine dataset path (Editor or Build version)
     string fullPath;
     if (Application.isEditor)
     {
@@ -145,21 +189,22 @@ public class VolumeDataNetworker : NetworkBehaviour
       fullPath = Path.Combine(Application.streamingAssetsPath, datasetPath);
     }
 
-    // Validate dataset file
+    // Check dataset file
     if (!File.Exists(fullPath))
     {
-      Debug.LogError($"Dataset file not found at {fullPath}. Ensure VisMale.raw is in Assets/StreamingAssets/EasyVolumeRendering/DataFiles/ for builds.");
+      Debug.LogError($"Volumetric dataset file not found at {fullPath}.");
       yield break;
     }
 
-    // Check for .ini file
+    // Check for .ini file (only .raw files)
     string iniPath = Path.ChangeExtension(fullPath, ".ini");
-    int dimX = 256, dimY = 256, dimZ = 128;
+    // Default .raw params according to plugin docs
+    int dimX = 128, dimY = 256, dimZ = 256;
     DataContentFormat format = DataContentFormat.Uint8;
     Endianness endianness = Endianness.LittleEndian;
     int bytesToSkip = 0;
 
-    if (File.Exists(iniPath))
+    if (File.Exists(iniPath)) // parse contents of .ini file
     {
       try
       {
@@ -186,7 +231,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     VolumeDataset dataset = importer.Import();
     if (dataset == null)
     {
-      Debug.LogError($"Server failed to import dataset from {fullPath}. Check dimensions ({dimX}x{dimY}x{dimZ}), format ({format}), endianness ({endianness}), and file size (8388608 bytes).");
+      Debug.LogError($"Server failed to import dataset from {fullPath}. Check dimensions ({dimX}x{dimY}x{dimZ}), format ({format}) and endianness ({endianness}).");
       yield break;
     }
 
@@ -203,7 +248,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
     // Normalize scale (mimicking VolumeObjectFactory)
     float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-    volumeGameObject.transform.localScale = Vector3.one / maxScale; // Adjust for visibility
+    volumeGameObject.transform.localScale = Vector3.one / maxScale; // TODO: Adjust for visibility
     volumeGameObject.transform.position = position ?? defaultPosition;
     volumeGameObject.transform.rotation = rotation ?? defaultRotation;
 
@@ -211,7 +256,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     NetworkObject networkObject = volumeGameObject.GetComponent<NetworkObject>();
     if (networkObject == null)
     {
-      Debug.LogError("Instantiated VolumeRenderedObjectPrefab missing NetworkObject!");
+      Debug.LogError("Instantiated VolumeRenderedObjectPrefab missing NetworkObject.");
       Destroy(volumeGameObject);
       yield break;
     }
@@ -224,38 +269,38 @@ public class VolumeDataNetworker : NetworkBehaviour
       meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
       if (meshRenderer != null && meshRenderer.sharedMaterial != null)
       {
-        Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+        Shader volumeShader = Shader.Find(DVRShaderName);
         if (volumeShader != null && meshRenderer.sharedMaterial.shader != volumeShader)
         {
-          Debug.LogWarning($"VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected VolumeRendering/DirectVolumeRenderingShader. Updating material.");
+          Debug.LogWarning($"VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected {DVRShaderName}. Updating material.");
           meshRenderer.sharedMaterial = new Material(volumeShader);
         }
         Debug.Log($"VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
       }
       else
       {
-        Debug.LogWarning("VolumeContainer missing MeshRenderer or material! Creating material.");
+        Debug.LogWarning("VolumeContainer missing MeshRenderer or material. Creating material.");
         meshRenderer = volumeContainer.gameObject.GetComponent<MeshRenderer>();
         if (meshRenderer == null)
         {
           meshRenderer = volumeContainer.gameObject.AddComponent<MeshRenderer>();
         }
-        Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+        Shader volumeShader = Shader.Find(DVRShaderName);
         if (volumeShader != null)
         {
           meshRenderer.material = new Material(volumeShader);
-          Debug.Log($"Applied shader VolumeRendering/DirectVolumeRenderingShader.");
+          Debug.Log($"Applied shader {DVRShaderName}.");
         }
         else
         {
-          Debug.LogWarning("Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
+          Debug.LogWarning($"Shader {DVRShaderName} not found. Using Standard shader as fallback.");
           meshRenderer.material = new Material(Shader.Find("Standard"));
         }
       }
     }
     else
     {
-      Debug.LogWarning("VolumeContainer child not found in VolumeRenderedObject! Creating manually.");
+      Debug.LogWarning("VolumeContainer child not found in VolumeRenderedObject. Creating manually.");
       GameObject container = new GameObject("VolumeContainer");
       container.transform.SetParent(volumeGameObject.transform, false);
       container.transform.localPosition = Vector3.zero;
@@ -265,15 +310,15 @@ public class VolumeDataNetworker : NetworkBehaviour
       meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().mesh;
       Destroy(GameObject.Find("Cube")); // Remove temporary cube
       meshRenderer = container.AddComponent<MeshRenderer>();
-      Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+      Shader volumeShader = Shader.Find(DVRShaderName);
       if (volumeShader != null)
       {
         meshRenderer.material = new Material(volumeShader);
-        Debug.Log($"Applied shader VolumeRendering/DirectVolumeRenderingShader.");
+        Debug.Log($"Applied shader {DVRShaderName}.");
       }
       else
       {
-        Debug.LogWarning("Shader VolumeRendering/DirectVolumeRenderingShader not found! Using Standard shader as fallback (volume may not render correctly).");
+        Debug.LogWarning($"Shader {DVRShaderName} not found. Using Standard shader as fallback.");
         meshRenderer.material = new Material(Shader.Find("Standard"));
       }
     }
@@ -341,6 +386,13 @@ public class VolumeDataNetworker : NetworkBehaviour
     Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={fullPath}");
   }
 
+  /// <summary>
+  /// Load the dataset on the client (or server) and assign it to the networked VolumeRenderedObject placeholder prefab (since FishNet *needs* all clients to have the same list of SpawnablePrefabs).
+  /// </summary>
+  /// <param name="datasetPath">(string -> nullable): Path to the dataset Defaults to this.datasetPath if null.</param>
+  /// <param name="position">(Vector3? -> nullable): Optional position. Defaults to defaultPosition if null.</param>
+  /// <param name="rotation">(Quaternion? -> nullable): Optional rotation. Defaults to defaultRotation if null.</param>
+  /// <returns></returns>
   private System.Collections.IEnumerator AssignLocalDataset(string datasetPath = null, Vector3? position = null, Quaternion? rotation = null)
   {
     NetworkObject networkObject = null;
@@ -350,7 +402,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     if (!IsServer)
     {
       int retryCount = 0;
-      const int maxRetries = 60; // Wait up to 30 seconds
+      const int maxRetries = 60; // Wait up to 60*0.5 = 30 seconds
       while (networkObject == null && retryCount < maxRetries)
       {
         NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
@@ -470,7 +522,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
       volumeObject.dataset = dataset;
 
-      // Normalize scale
+      // Normalise scale
       float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
       volumeObject.transform.localScale = Vector3.one / maxScale;
 
@@ -482,10 +534,10 @@ public class VolumeDataNetworker : NetworkBehaviour
         meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
         if (meshRenderer != null && meshRenderer.sharedMaterial != null)
         {
-          Shader volumeShader = Shader.Find("VolumeRendering/DirectVolumeRenderingShader");
+          Shader volumeShader = Shader.Find(DVRShaderName);
           if (volumeShader != null && meshRenderer.sharedMaterial.shader != volumeShader)
           {
-            Debug.LogWarning($"Client: VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected VolumeRendering/DirectVolumeRenderingShader. Updating material.");
+            Debug.LogWarning($"Client: VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected {DVRShaderName}. Updating material.");
             meshRenderer.sharedMaterial = new Material(volumeShader);
           }
           Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}, Material name: {meshRenderer.sharedMaterial.name}");
@@ -563,11 +615,16 @@ public class VolumeDataNetworker : NetworkBehaviour
       Debug.Log($"Client used existing dataset in networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
     }
 
-    // Ensure position, rotation, and scale
+    // Ensure position, rotation
     volumeObject.transform.position = position ?? defaultPosition;
     volumeObject.transform.rotation = rotation ?? defaultRotation;
   }
 
+  /// <summary>
+  /// Server RPC to handle a Client’s request for the current dataset and volume state.
+  /// </summary>
+  /// <param name="conn">(NetworkConnection): The requesting client’s connection.</param>
+  /// <returns></returns>
   [ServerRpc(RequireOwnership = false)]
   private void RequestCurrentDatasetServerRpc(NetworkConnection conn)
   {
