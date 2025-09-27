@@ -43,7 +43,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     if (!IsServer)
     {
       // Client assigns local dataset to networked object
-      StartCoroutine(AssignLocalDataset());
+      RequestCurrentDatasetServerRpc(NetworkManager.ClientManager.Connection);
     }
   }
 
@@ -352,23 +352,44 @@ public class VolumeDataNetworker : NetworkBehaviour
       const int maxRetries = 60; // Wait up to 30 seconds
       while (networkObject == null && retryCount < maxRetries)
       {
-        networkObject = FindObjectsOfType<NetworkObject>().FirstOrDefault(nob => nob.GetComponent<VolumeRenderedObject>() != null);
+        NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
+        networkObject = networkObjects.FirstOrDefault(nob =>
+            nob.transform.Find("VolumeContainer") != null ||
+            nob.GetComponent<NetworkTransform>() != null);
         if (networkObject == null)
         {
-          Debug.Log($"Client waiting for networked VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}. Found {FindObjectsOfType<NetworkObject>().Length} NetworkObjects.");
+          Debug.Log($"Client waiting for networked VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}. Found {networkObjects.Length} NetworkObjects. Expected PrefabId={volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId}, datasetPath={datasetPath}");
+          foreach (NetworkObject nob in networkObjects)
+          {
+            Debug.Log($"Client: Found NetworkObject - ObjectId={nob.ObjectId}, PrefabId={nob.PrefabId}, Name={nob.gameObject.name}, HasVolumeContainer={nob.transform.Find("VolumeContainer") != null}, HasNetworkTransform={nob.GetComponent<NetworkTransform>() != null}");
+          }
           retryCount++;
           yield return new WaitForSeconds(0.5f);
         }
         else
         {
           volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
-          Debug.Log($"Client found VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
+          if (volumeObject == null)
+          {
+            Debug.LogWarning($"Client: VolumeRenderedObject component missing on spawned NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Adding component.");
+            try
+            {
+              volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
+              Debug.Log($"Client: Successfully added VolumeRenderedObject component to ObjectId={networkObject.ObjectId}, GameObject={networkObject.gameObject.name}");
+            }
+            catch (System.Exception e)
+            {
+              Debug.LogError($"Client: Failed to add VolumeRenderedObject component to ObjectId={networkObject.ObjectId}. Error: {e.Message}");
+              yield break;
+            }
+          }
+          Debug.Log($"Client found NetworkObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}, HasVolumeRenderedObject={volumeObject != null}, HasVolumeContainer={networkObject.transform.Find("VolumeContainer") != null}");
         }
       }
 
       if (networkObject == null || volumeObject == null)
       {
-        Debug.LogError($"Client failed to find networked VolumeRenderedObject after {maxRetries} retries. Ensure prefab is registered in NetworkManager and server is spawning correctly.");
+        Debug.LogError($"Client failed to find or initialize networked VolumeRenderedObject after {maxRetries} retries. Expected PrefabId={volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId}, datasetPath={datasetPath}. Ensure prefab is registered in NetworkManager and server is spawning correctly.");
         yield break;
       }
     }
@@ -576,5 +597,28 @@ public class VolumeDataNetworker : NetworkBehaviour
     // Ensure position, rotation, and scale
     volumeObject.transform.position = position ?? defaultPosition;
     volumeObject.transform.rotation = rotation ?? defaultRotation;
+  }
+
+  [ServerRpc(RequireOwnership = false)]
+  private void RequestCurrentDatasetServerRpc(NetworkConnection conn)
+  {
+    if (isVolumeSpawned && volumeObject != null)
+    {
+      NetworkObject networkObject = volumeObject.GetComponent<NetworkObject>();
+      if (networkObject != null)
+      {
+        Debug.Log($"Server: Notifying client {conn.ClientId} of current dataset: {datasetPath}, ObjectId={networkObject.ObjectId}");
+        TargetAssignLocalDataset(conn, datasetPath, volumeObject.transform.position, volumeObject.transform.rotation);
+      }
+      else
+      {
+        Debug.LogWarning($"Server: VolumeRenderedObject missing NetworkObject for client {conn.ClientId}");
+      }
+    }
+    else
+    {
+      Debug.Log($"Server: No volume spawned yet for client {conn.ClientId}. Spawning new volume.");
+      StartCoroutine(NetworkVolumeObject());
+    }
   }
 }
