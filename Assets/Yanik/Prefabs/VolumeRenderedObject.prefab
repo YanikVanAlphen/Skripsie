@@ -97,7 +97,7 @@ GameObject:
   - component: {fileID: 8820330590721950714}
   - component: {fileID: 7478292962984277194}
   m_Layer: 0
-  m_Name: VolumeRenderedObjectPrefab
+  m_Name: VolumeRenderedObject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -146,7 +146,7 @@ MonoBehaviour:
   <PrefabId>k__BackingField: 3
   _scenePathHash: 0
   <SceneId>k__BackingField: 0
-  <AssetPathHash>k__BackingField: 5370167735564045514
+  <AssetPathHash>k__BackingField: 2861378287800101458
   _sceneNetworkObjects:
   - {fileID: 4010609222888918593}
   - {fileID: 0}

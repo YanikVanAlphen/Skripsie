@@ -13,31 +13,27 @@ using System.IO;
      * RenderMode.IsosurfaceRendering
      */
 
-using FishNet.Object;
-using FishNet.Connection;
-using FishNet.Component.Transforming;
-using UnityEngine;
-using UnityVolumeRendering;
-using System.IO;
-using System.Linq;
-
 public class VolumeDataNetworker : NetworkBehaviour
 {
   [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Relative to Assets (Editor) or StreamingAssets (build)
-  [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 2f, 0f); // above origin
+  [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 3f, 0f); // In front of VR camera
   [SerializeField] private Quaternion defaultRotation = Quaternion.identity;
   [SerializeField] private GameObject volumeRenderedObjectPrefab; // Assign VolumeRenderedObjectPrefab.prefab (with NetworkObject, NetworkTransform, VolumeSync, OwnershipManager, VolumeRenderedObject, VolumeContainer)
 
   private VolumeRenderedObject volumeObject;
+  private bool isVolumeSpawned; // Track if volume is already spawned
 
   private void Start()
   {
+    // Register prefab at start
+    RegisterPrefab();
     if (IsServer)
     {
-      // Register prefab at start
-      RegisterPrefab();
       // Host creates and networks VolumeRenderedObject
-      StartCoroutine(NetworkVolumeObject());
+      if (!isVolumeSpawned)
+      {
+        StartCoroutine(NetworkVolumeObject());
+      }
     }
   }
 
@@ -94,7 +90,10 @@ public class VolumeDataNetworker : NetworkBehaviour
   {
     // Update dataset path and network object
     datasetPath = newDatasetPath;
-    StartCoroutine(NetworkVolumeObject(position, rotation));
+    if (!isVolumeSpawned)
+    {
+      StartCoroutine(NetworkVolumeObject(position, rotation));
+    }
     // Send TargetRpc to each client
     foreach (NetworkConnection clientConn in NetworkManager.ClientManager.Clients.Values)
     {
@@ -110,6 +109,23 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private System.Collections.IEnumerator NetworkVolumeObject(Vector3? position = null, Quaternion? rotation = null)
   {
+    // Prevent multiple spawns
+    if (isVolumeSpawned)
+    {
+      Debug.LogWarning("Volume already spawned on server, skipping NetworkVolumeObject.");
+      yield break;
+    }
+
+    // Destroy existing VolumeRenderedObjects
+    foreach (var existingObj in FindObjectsOfType<VolumeRenderedObject>())
+    {
+      if (existingObj.gameObject != gameObject)
+      {
+        Debug.Log($"Destroying existing VolumeRenderedObject: {existingObj.gameObject.name}");
+        ServerManager.Despawn(existingObj.gameObject);
+      }
+    }
+
     // Validate prefab
     if (volumeRenderedObjectPrefab == null)
     {
@@ -184,10 +200,11 @@ public class VolumeDataNetworker : NetworkBehaviour
     // Assign dataset
     volumeObject.dataset = dataset;
 
-    // Set position, rotation, and scale
+    // Normalize scale (mimicking VolumeObjectFactory)
+    float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
+    volumeGameObject.transform.localScale = Vector3.one / maxScale * 0.1f; // Adjust for visibility
     volumeGameObject.transform.position = position ?? defaultPosition;
     volumeGameObject.transform.rotation = rotation ?? defaultRotation;
-    volumeGameObject.transform.localScale = new Vector3(1f, 1f, 1f); // Adjust scale for visibility
 
     // Verify NetworkObject
     NetworkObject networkObject = volumeGameObject.GetComponent<NetworkObject>();
@@ -287,7 +304,7 @@ public class VolumeDataNetworker : NetworkBehaviour
         Debug.LogWarning("Failed to get transfer function texture.");
       }
 
-      // Generate noise texture (mimicking VolumeObjectFactory)
+      // Generate noise texture
       const int noiseDimX = 512;
       const int noiseDimY = 512;
       Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
@@ -319,6 +336,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
     // Spawn on server
     ServerManager.Spawn(volumeGameObject);
+    isVolumeSpawned = true;
     Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={fullPath}");
   }
 
@@ -409,6 +427,10 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
 
       volumeObject.dataset = dataset;
+
+      // Normalize scale
+      float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
+      volumeObject.transform.localScale = Vector3.one / maxScale * 0.1f;
 
       // Verify VolumeContainer
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer");
@@ -536,6 +558,5 @@ public class VolumeDataNetworker : NetworkBehaviour
     // Ensure position, rotation, and scale
     volumeObject.transform.position = position ?? defaultPosition;
     volumeObject.transform.rotation = rotation ?? defaultRotation;
-    volumeObject.transform.localScale = new Vector3(1f, 1f, 1f); // Adjust scale for visibility
   }
 }
