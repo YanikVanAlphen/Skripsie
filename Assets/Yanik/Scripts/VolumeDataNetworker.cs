@@ -371,8 +371,8 @@ public class VolumeDataNetworker : NetworkBehaviour
           volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
           if (volumeObject == null)
           {
-            Debug.LogError($"Client: VolumeRenderedObject component missing on correct NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Ensure the prefab has this component attached on both host and client.");
-            yield break;
+            Debug.LogWarning($"Client: VolumeRenderedObject component missing on correct NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Adding component.");
+            volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
           }
           Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
           if (volumeContainer == null)
