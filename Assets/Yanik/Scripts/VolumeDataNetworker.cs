@@ -27,7 +27,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Relative to Assets (running from editor) or StreamingAssets folder in build version
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
-  [SerializeField] private GameObject volumeRenderedObjectPrefab;
+  [SerializeField] public GameObject volumeRenderedObjectPrefab; // public for access by Volume Data Control UI script
   [SerializeField] private GameObject volumeControlCanvasPrefab;
 
   private VolumeRenderedObject volumeObject;
