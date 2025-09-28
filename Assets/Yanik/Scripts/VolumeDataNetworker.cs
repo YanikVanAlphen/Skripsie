@@ -33,6 +33,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   private VolumeRenderedObject volumeObject;
   private GameObject canvasObject;
   private bool isVolumeSpawned;
+  private bool isCanvasSpawned;
   private string DVRShaderName = "VolumeRendering/DirectVolumeRenderingShader";
 
   /// <summary>
@@ -412,10 +413,10 @@ public class VolumeDataNetworker : NetworkBehaviour
         yield break;
       }
 
-      VolumeControlUI controlUI = canvasObject.GetComponent<VolumeControlUI>();
+      VolumeDataControlUI controlUI = canvasObject.GetComponent<VolumeDataControlUI>();
       if (controlUI == null)
       {
-        Debug.LogError("VolumeControlCanvasPrefab missing VolumeControlUI component.");
+        Debug.LogError("VolumeControlCanvasPrefab missing VolumeDataControlUI component.");
         Destroy(canvasObject);
         yield break;
       }
