@@ -28,7 +28,8 @@ public class VoiceAvatar : NetworkBehaviour
       if (voiceNetwork != null)
       {
         // Create positional audio output factory based on example from FishNet script
-        agent = voiceNetwork.CreateAgent(new PositionalAudioOutputFactory(maxDistance, rolloffDistance, new PositionalAudioParameters(spatialize, minGain, maxGain, offset, rolloffFactor)));
+        // agent = voiceNetwork.CreateAgent(new PositionalAudioOutputFactory(maxDistance, rolloffDistance, new PositionalAudioParameters(spatialize, minGain, maxGain, offset, rolloffFactor)));
+        agent = voiceNetwork.CreateAgent(); // default non positional agent for testing
         agent.JoinChatroom(roomName);
         Debug.Log($"Positional voice agent created and joined {roomName} room for local player.");
       }
