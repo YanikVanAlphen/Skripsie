@@ -4,19 +4,23 @@ using FishNet.Object;
 using FishNet.Managing;
 using FishNet.Transporting;
 using FishNet.Transporting.Tugboat;
+using FishyVoice;
 using UnityEngine;
+using System;
 using System.Net;
 using System.Linq;
+using System.Collections;
 using TMPro;
 
 public class ConnectionSetup : MonoBehaviour
 {
   [SerializeField] private NetworkManager networkManager;
-  [SerializeField] private GameObject userAvatarPrefab; // Optional: Assign for explicit spawning
+  [SerializeField] private GameObject userAvatarPrefab; // for explicit spawning
   public Canvas mainMenuCanvas;
   [SerializeField] private GameObject ipInputFieldObject;
 
   private string IP = "10.255.10.54";
+  private const string VOICE_ROOM_NAME = "<DEFAULT>";
 
   private void Start()
   {
@@ -26,30 +30,82 @@ public class ConnectionSetup : MonoBehaviour
       return;
     }
     // Debug connection states
-    InstanceFinder.ClientManager.OnClientConnectionState += (state) => Debug.Log($"Client state: {state}");
-    InstanceFinder.ServerManager.OnServerConnectionState += (state) => Debug.Log($"Server state: {state}");
-    InstanceFinder.ServerManager.OnRemoteConnectionState += (conn, args) => Debug.Log($"Client {conn.ClientId} state: {args.ConnectionState}");
-    // Optional: Uncomment for explicit spawning
-    /*
-    InstanceFinder.ServerManager.OnRemoteConnectionState += (conn, args) =>
+    InstanceFinder.ClientManager.OnClientConnectionState += ClientConnectionState;
+    InstanceFinder.ServerManager.OnServerConnectionState += ServerConnectionState;
+    InstanceFinder.ServerManager.OnRemoteConnectionState += (conn, args) => RemoteConnectionState(conn, args);
+  }
+
+  private void ServerConnectionState(ServerConnectionStateArgs args)
+  {
+    Debug.Log($"Server state: {args.ConnectionState}");
+    if (args.ConnectionState == LocalConnectionState.Started)
     {
-        if (args.ConnectionState == RemoteConnectionState.Started)
+      // Create default voice chatroom when server starts
+      VoiceNetwork voiceNetwork = VoiceNetwork.instance;
+      if (voiceNetwork != null)
+      {
+        try
         {
-            Debug.Log($"Client {conn.ClientId} connected, spawning UserAvatar.");
-            SpawnPlayerForClient(conn);
+          voiceNetwork.HostChatroom(VOICE_ROOM_NAME);
+          Debug.Log($"Created voice chatroom: {VOICE_ROOM_NAME}");
         }
-    };
-    */
+        catch (Exception e)
+        {
+          Debug.LogError($"Failed to create voice chatroom: {e.Message}");
+        }
+      }
+      else
+      {
+        Debug.LogError("VoiceNetwork instance not found in scene!");
+      }
+    }
+  }
+
+  private void ClientConnectionState(ClientConnectionStateArgs args)
+  {
+    Debug.Log($"Client state: {args.ConnectionState}");
+    if (args.ConnectionState == LocalConnectionState.Started)
+    {
+      // Delay joining to ensure server room is ready
+      StartCoroutine(JoinVoiceRoomDelayed());
+    }
+  }
+
+  private IEnumerator JoinVoiceRoomDelayed()
+  {
+    yield return new WaitForSeconds(1f); // Wait for server
+    VoiceNetwork voiceNetwork = VoiceNetwork.instance;
+    if (voiceNetwork != null)
+    {
+      try
+      {
+        voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
+        Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined voice chatroom: {VOICE_ROOM_NAME}");
+      }
+      catch (Exception e)
+      {
+        Debug.LogError($"Client failed to join voice chatroom: {e.Message}");
+      }
+    }
+    else
+    {
+      Debug.LogError("VoiceNetwork instance not found for client!");
+    }
+  }
+
+  private void RemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
+  {
+    Debug.Log($"Client {conn.ClientId} state: {args.ConnectionState}");
   }
 
   private void OnDestroy()
   {
     if (InstanceFinder.ClientManager != null)
-      InstanceFinder.ClientManager.OnClientConnectionState -= (state) => Debug.Log($"Client state: {state}");
+      InstanceFinder.ClientManager.OnClientConnectionState -= ClientConnectionState;
     if (InstanceFinder.ServerManager != null)
     {
-      InstanceFinder.ServerManager.OnServerConnectionState -= (state) => Debug.Log($"Server state: {state}");
-      InstanceFinder.ServerManager.OnRemoteConnectionState -= (conn, args) => Debug.Log($"Client {conn.ClientId} state: {args.ConnectionState}");
+      InstanceFinder.ServerManager.OnServerConnectionState -= ServerConnectionState;
+      InstanceFinder.ServerManager.OnRemoteConnectionState -= (conn, args) => RemoteConnectionState(conn, args);
     }
   }
 
@@ -64,7 +120,7 @@ public class ConnectionSetup : MonoBehaviour
     tugboat.SetClientAddress("127.0.0.1"); // Host's client connects to itself
     tugboat.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4);
     tugboat.SetPort(7770);
-    Debug.Log("Starting Host on 10.255.10.54:7770");
+    Debug.Log($"Starting Host on {IP}:7770");
     StartServer();
     StartClient();
   }
@@ -112,7 +168,7 @@ public class ConnectionSetup : MonoBehaviour
       else
       {
         tugboat.SetClientAddress(IP);
-        Debug.LogWarning($"Input field is empty or missing TMP_InputField, using default: {IP}");
+        Debug.LogWarning($"Input field is empty, using default: {IP}");
       }
     }
     else
@@ -127,7 +183,8 @@ public class ConnectionSetup : MonoBehaviour
   {
     if (mainMenuCanvas != null)
     {
-      mainMenuCanvas.gameObject.SetActive(false);
+      //mainMenuCanvas.gameObject.SetActive(false);
+      mainMenuCanvas.enabled = false; // only disable visual
     }
   }
 
