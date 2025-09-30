@@ -207,7 +207,7 @@ MonoBehaviour:
   _extrapolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  _clientAuthoritative: 0
+  _clientAuthoritative: 1
   _sendToOwner: 1
   _interval: 1
   _synchronizePosition: 1
@@ -319,7 +319,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 0
-  m_IsKinematic: 0
+  m_IsKinematic: 1
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -330,7 +330,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 687899278494396546}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f572e46af83151541aed4c1c20a097ec, type: 3}
   m_Name: 
@@ -339,7 +339,7 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 4010609222888918593}
   _networkObjectCache: {fileID: 4010609222888918593}
   target: {fileID: 6706588429914722639}
-  targetIsKinematic: 0
+  targetIsKinematic: 1
   clientAuthority: 1
   syncVelocity: 1
   clearVelocity: 0

@@ -167,13 +167,34 @@ namespace uMuVR {
 			var no = e.interactorObject.transform.GetComponentInParent<NetworkObject>();
       if (no is null) return;
 
-			GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
-      // MY EDIT
-      Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, transferring ownership.");
+      //GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
+      //   // MY EDIT
+      //   Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, transferring ownership.");
+      //   TransferCanvasOwnership(no.Owner);
+      //   //
+      //   selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
+      Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+      if (!NetworkObject.IsOwner)
+      {
+        NetworkObject.GiveOwnership(no.Owner);
+        Debug.Log($"OwnershipManager: Requested ownership transfer to client {no.Owner.ClientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+      }
+      else
+      {
+        Debug.Log($"OwnershipManager: Already owner (ClientId={no.Owner.ClientId}) for {gameObject.name}.");
+      }
       TransferCanvasOwnership(no.Owner);
-      //
-      selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
-		}
+      selectionCount++;
+      NetworkTransform nt = GetComponent<NetworkTransform>();
+      if (nt != null)
+      {
+        Debug.Log($"OwnershipManager: NetworkTransform sync state - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}, IsOwner: {NetworkObject.IsOwner}");
+      }
+      else
+      {
+        Debug.LogError($"OwnershipManager: NetworkTransform missing on {gameObject.name}!");
+      }
+    }
 
 		protected void OnUxrInteractableSelected(object sender, UxrManipulationEventArgs args) {
 			// note: beware of NetworkObjects that may be in the way of the user representation that we are looking for
@@ -182,13 +203,34 @@ namespace uMuVR {
 			if (no is null) return;
 
       // MY EDIT
-      Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, transferring ownership.");
-      GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
-      TransferCanvasOwnership(no.Owner);
-      selectionCount++;
+      //Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, transferring ownership.");
+      //GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
+      //TransferCanvasOwnership(no.Owner);
+      //selectionCount++;
       //selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
       //GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
       //
+      Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+      if (!NetworkObject.IsOwner)
+      {
+        NetworkObject.GiveOwnership(no.Owner);
+        Debug.Log($"OwnershipManager: Requested ownership transfer to client {no.Owner.ClientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+      }
+      else
+      {
+        Debug.Log($"OwnershipManager: Already owner (ClientId={no.Owner.ClientId}) for {gameObject.name}.");
+      }
+      TransferCanvasOwnership(no.Owner);
+      selectionCount++;
+      NetworkTransform nt = GetComponent<NetworkTransform>();
+      if (nt != null)
+      {
+        Debug.Log($"OwnershipManager: NetworkTransform sync state - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}, IsOwner: {NetworkObject.IsOwner}");
+      }
+      else
+      {
+        Debug.LogError($"OwnershipManager: NetworkTransform missing on {gameObject.name}!");
+      }
     }
 
 		/// <summary>
@@ -255,6 +297,18 @@ namespace uMuVR {
         Debug.Log($"OwnershipManager: Transferred canvas ownership to client {newOwner?.ClientId ?? -1}, ObjectId={canvasNetworkObject.ObjectId}, PrefabId={canvasNetworkObject.PrefabId}");
       }
     }
+
+    //private void Update() // Update logs
+    //{
+    //  if (IsOwner)
+    //  {
+    //    NetworkTransform nt = GetComponent<NetworkTransform>();
+    //    if (nt != null)
+    //    {
+    //      Debug.Log($"OwnershipManager: Client {NetworkManager.ClientManager.Connection.ClientId} updating {gameObject.name} (ObjectId={NetworkObject.ObjectId}) - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}");
+    //    }
+    //  }
+    //}
     /////
 
 #if UNITY_EDITOR

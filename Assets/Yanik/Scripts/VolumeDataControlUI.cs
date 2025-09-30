@@ -34,8 +34,13 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     if (volumeDataNetworker == null)
     {
-      Debug.LogError("VolumeDataNetworker not assigned in VolumeDataControlUI.");
-      return;
+      volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
+      if (volumeDataNetworker == null)
+      {
+        Debug.LogError("VolumeDataControlUI: No VolumeDataNetworker found in scene.");
+        return;
+      }
+      Debug.LogWarning("VolumeDataControlUI: VolumeDataNetworker was unassigned, found via FindObjectOfType.");
     }
 
     StartCoroutine(FindVolumeObject());

@@ -1972,7 +1972,7 @@ MonoBehaviour:
   m_Name: WebGL
   m_EditorClassIdentifier: 
   features:
-  - {fileID: -3221918376339208402}
+  - {fileID: 443636983708708830}
   m_renderMode: 1
   m_latencyOptimization: 0
   m_autoColorSubmissionMode: 1
@@ -5532,27 +5532,27 @@ MonoBehaviour:
   m_Name: Android
   m_EditorClassIdentifier: 
   features:
-  - {fileID: 8547566068801785298}
-  - {fileID: 1774471395808827364}
-  - {fileID: -5084315543255369951}
-  - {fileID: -7601303697623706415}
-  - {fileID: 9184669345486158925}
-  - {fileID: 4872776562657368012}
-  - {fileID: -7319957645647351845}
-  - {fileID: -6049998064278984229}
-  - {fileID: -4421681317180277294}
+  - {fileID: 6038857911205344564}
+  - {fileID: -312381497074565557}
+  - {fileID: -1397225986753471050}
+  - {fileID: 5965099436953260893}
+  - {fileID: 2157626240138780874}
+  - {fileID: -1063525097966520156}
+  - {fileID: -3064051121135403940}
+  - {fileID: -834346120554962039}
+  - {fileID: 313527652888334330}
   - {fileID: 692676084373148457}
   - {fileID: 2491318423688811252}
   - {fileID: 7269268441045017224}
   - {fileID: -1023454557553384902}
   - {fileID: 2615463401490597761}
-  - {fileID: 7817035546361582551}
-  - {fileID: 8599906985439284318}
-  - {fileID: 3509962432061121228}
-  - {fileID: -2468453985792614924}
-  - {fileID: -6527186419439090294}
-  - {fileID: -3249298834014116665}
-  - {fileID: -4057613543152020900}
+  - {fileID: 2734489573204777870}
+  - {fileID: 2650827440451666380}
+  - {fileID: -437512894707520866}
+  - {fileID: 6735691511982133245}
+  - {fileID: -5357082340926490135}
+  - {fileID: 6945346255458792496}
+  - {fileID: -9201128818552236683}
   m_renderMode: 1
   m_latencyOptimization: 0
   m_autoColorSubmissionMode: 1
@@ -16724,28 +16724,28 @@ MonoBehaviour:
   m_Name: Standalone
   m_EditorClassIdentifier: 
   features:
-  - {fileID: -874806892903904292}
-  - {fileID: -1249462367959246476}
-  - {fileID: -2157185689882489593}
-  - {fileID: 4636184503619615805}
-  - {fileID: -4957150070018853930}
-  - {fileID: 1513551475224142126}
-  - {fileID: -2952230946460222630}
-  - {fileID: 8616523413463727316}
-  - {fileID: -799035683238405324}
-  - {fileID: 5036220836853147669}
+  - {fileID: -7126634331807829454}
+  - {fileID: -5287011415590967668}
+  - {fileID: 8998010417283312487}
+  - {fileID: -6937543076850724180}
+  - {fileID: -6007485750950111592}
+  - {fileID: 3953635231830578643}
+  - {fileID: -7377493623918069164}
+  - {fileID: -2712045609780662925}
+  - {fileID: 3046218855198191431}
+  - {fileID: 1302902646051816603}
   - {fileID: 2744017460871575585}
   - {fileID: -7910382042330488907}
   - {fileID: -4611741516161089639}
   - {fileID: -4900362067559862358}
-  - {fileID: 537317347833206047}
-  - {fileID: -4324131963284999944}
-  - {fileID: -4477323810255804402}
-  - {fileID: -2405654299740066203}
-  - {fileID: -3104703455657673138}
-  - {fileID: 2865860897416061940}
-  - {fileID: -8949730687385780471}
-  - {fileID: 4800401789476487459}
+  - {fileID: -5936911007673670689}
+  - {fileID: -9113504982503286126}
+  - {fileID: -4961735657126279966}
+  - {fileID: -3368482857083574555}
+  - {fileID: -2927414435351511782}
+  - {fileID: 3571998437777202630}
+  - {fileID: 5460625402518637967}
+  - {fileID: -1933737461706689026}
   m_renderMode: 0
   m_latencyOptimization: 0
   m_autoColorSubmissionMode: 1
@@ -16973,7 +16973,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a24be4b5ebfe5f4d8ed1de9b25cb7aa, type: 3}
   m_Name: HandCommonPosesInteraction Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Hand Interaction Poses
   version: 0.0.1
   featureIdInternal: com.unity.openxr.feature.input.handinteractionposes
@@ -23750,7 +23750,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5019471fb2174e5c852ecd4047163007, type: 3}
   m_Name: HandInteractionProfile Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Hand Interaction Profile
   version: 0.0.1
   featureIdInternal: com.unity.openxr.feature.input.handinteraction
@@ -43597,7 +43597,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: feeef8d85de8db242bdda70cc7ff5acd, type: 3}
   m_Name: OculusTouchControllerProfile Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Oculus Touch Controller Profile
   version: 0.0.1
   featureIdInternal: com.unity.openxr.feature.input.oculustouch
@@ -78790,7 +78790,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c4b862ee14fb479fbfe5fffe655d3ed3, type: 3}
   m_Name: MetaQuestTouchProControllerProfile Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Meta Quest Touch Pro Controller Profile
   version: 0.0.1
   featureIdInternal: com.unity.openxr.feature.input.metaquestpro
@@ -92842,7 +92842,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2b7365b139f7aec43b23d26b7a48b5a6, type: 3}
   m_Name: MetaQuestTouchPlusControllerProfile Standalone
   m_EditorClassIdentifier: 
-  m_enabled: 0
+  m_enabled: 1
   nameUi: Meta Quest Touch Plus Controller Profile
   version: 0.0.1
   featureIdInternal: com.unity.openxr.feature.input.metaquestplus
