@@ -621,23 +621,32 @@ public class VolumeDataNetworker : NetworkBehaviour
       NetworkObject networkObject = volumeObject.GetComponent<NetworkObject>();
       if (networkObject != null)
       {
-        byte[] serializedData = DatasetSerializer.Serialize(volumeObject.dataset);
-        if (serializedData != null)
+        if (dataChunks != null && dataChunks.Length > 0)
         {
-          byte[][] chunks = DatasetSerializer.ChunkData(serializedData);
-          if (chunks != null && chunks.Length > 0)
-          {
-            StartCoroutine(SendDatasetToClient(conn, chunks));
-            Debug.Log($"Server: Sending dataset to client {conn.ClientId}, ObjectId={networkObject.ObjectId}");
-          }
-          else
-          {
-            Debug.LogError($"Server: Failed to chunk dataset for client {conn.ClientId}");
-          }
+          StartCoroutine(SendDatasetToClient(conn, dataChunks));
+          Debug.Log($"Server: Sending dataset to client {conn.ClientId}, ObjectId={networkObject.ObjectId}, Chunks={dataChunks.Length}");
         }
         else
         {
-          Debug.LogError($"Server: Failed to serialize dataset for client {conn.ClientId}");
+          Debug.LogError($"Server: No dataset chunks available for client {conn.ClientId}. Re-serializing dataset.");
+          byte[] serializedData = DatasetSerializer.Serialize(volumeObject.dataset);
+          if (serializedData != null)
+          {
+            dataChunks = DatasetSerializer.ChunkData(serializedData);
+            if (dataChunks != null && dataChunks.Length > 0)
+            {
+              StartCoroutine(SendDatasetToClient(conn, dataChunks));
+              Debug.Log($"Server: Re-serialized and sending dataset to client {conn.ClientId}, ObjectId={networkObject.ObjectId}, Chunks={dataChunks.Length}");
+            }
+            else
+            {
+              Debug.LogError($"Server: Failed to chunk dataset for client {conn.ClientId}");
+            }
+          }
+          else
+          {
+            Debug.LogError($"Server: Failed to serialize dataset for client {conn.ClientId}");
+          }
         }
       }
       else
