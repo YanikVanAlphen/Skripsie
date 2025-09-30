@@ -1,12 +1,17 @@
 using FishNet.Object;
 using FishNet.Connection;
 using FishNet.Component.Transforming;
+using FishNet.Managing.Server;
+using FishNet.Managing.Object;
+using FishNet.Managing;
+using FishNet.Transporting;
+using FishNet.Transporting.Tugboat;
 using UnityEngine;
 using UnityVolumeRendering;
 using System.Linq;
-using FishNet.Managing.Object;
 using System.IO;
 using System;
+using System.Collections.Generic;
 
 /* RENDERING OPTIONS:
      * RenderMode.DirectVolumeRendering
@@ -16,18 +21,16 @@ using System;
 
 /// <summary>
 /// Manages the networking of a volumetric dataset by spawning a VolumeRenderedObject on the server.
-/// Clients are notified to load the same dataset. Also ensures that the volume is rendered correctly with synchronised potisiton/rotation/scale.
-/// Inherits from NetworkBehaviour, allowign client-server Remote Procedure Call (RPC)s and management of networked GameObjects.
-/// Uses UnityVolumeRendering (https://github.com/mlavik1/UnityVolumeRendering.git) for dataset loading and rendering.
+/// Clients receive the dataset from the host via serialization, without needing local files. Ensures synchronized position/rotation/scale.
+/// Inherits from NetworkBehaviour, allowing client-server Remote Procedure Call (RPC)s and management of networked GameObjects.
+/// Uses UnityVolumeRendering[](https://github.com/mlavik1/UnityVolumeRendering.git) for dataset loading and rendering.
 /// </summary>
-/// <param</param>
-/// <returns></returns>
 public class VolumeDataNetworker : NetworkBehaviour
 {
-  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Relative to Assets (running from editor) or StreamingAssets folder in build version
+  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
-  [SerializeField] public GameObject volumeRenderedObjectPrefab; // public for access by Volume Data Control UI script
+  [SerializeField] public GameObject volumeRenderedObjectPrefab; // Public for VolumeDataControlUI
   [SerializeField] private GameObject volumeControlCanvasPrefab;
 
   private VolumeRenderedObject volumeObject;
@@ -35,18 +38,15 @@ public class VolumeDataNetworker : NetworkBehaviour
   private bool isVolumeSpawned;
   private bool isCanvasSpawned;
   private string DVRShaderName = "VolumeRendering/DirectVolumeRenderingShader";
+  private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>();
+  private byte[][] dataChunks; // Store chunks for late-joining clients
 
-  /// <summary>
-  /// Called automatically by Unity on program start. 
-  /// Init volume rendering process on the server when the script starts.
-  /// </summary>
-  /// <param</param>
-  /// <returns></returns>
   private void Start()
   {
     if (IsServer)
     {
-      // Host: create and network VolumeRenderedObject
+      ServerManager.OnServerConnectionState += OnServerConnectionState;
+      Debug.Log("Registered OnServerConnectionState");
       if (!isVolumeSpawned)
       {
         StartCoroutine(NetworkVolumeObject());
@@ -54,31 +54,45 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  /// <summary>
-  /// Handles client init, triggered when a Client joins the Host session.
-  /// </summary>
-  /// <param</param>
-  /// <returns></returns>
+  private void OnServerConnectionState(ServerConnectionStateArgs args)
+  {
+    if (args.ConnectionState == LocalConnectionState.Started)
+    {
+      // Find most recently connected client
+      NetworkConnection conn = ServerManager.Clients.Values.OrderByDescending(c => c.ClientId).FirstOrDefault();
+      if (conn != null)
+      {
+        Debug.Log($"Client {conn.ClientId} connected. Sending dataset...");
+        if (dataChunks != null && dataChunks.Length > 0)
+        {
+          StartCoroutine(SendDatasetToClient(conn, dataChunks));
+        }
+        else
+        {
+          Debug.LogWarning($"No dataset chunks available for client {conn.ClientId}.");
+        }
+      }
+      else
+      {
+        Debug.LogWarning("No NetworkConnection found for new client.");
+      }
+    }
+  }
+
   public override void OnStartClient()
   {
     base.OnStartClient();
     if (!IsServer)
     {
-      // Client: assign local dataset to networked object
       RequestCurrentDatasetServerRpc(NetworkManager.ClientManager.Connection);
     }
   }
 
-  /// <summary>
-  /// Registers volumeRenderedObject prefab with the NetworkManager to allow networked spawning -- DEPRECATED
-  /// </summary>
-  /// <param</param>
-  /// <returns></returns>
   private void RegisterPrefab()
   {
     if (volumeRenderedObjectPrefab == null)
     {
-      Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker.");
+      Debug.LogError("VolumeRenderedObjectPrefab is not assigned.");
       return;
     }
 
@@ -86,24 +100,16 @@ public class VolumeDataNetworker : NetworkBehaviour
     if (prefabNetworkObject != null)
     {
       PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
-      bool isRegistered = false;
-      for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
-      {
-        if (prefabObjects.GetObject(true, i) == prefabNetworkObject)
-        {
-          isRegistered = true;
-          break;
-        }
-      }
-
+      bool isRegistered = prefabObjects.GetObjectCount() > 0 && Enumerable.Range(0, prefabObjects.GetObjectCount())
+          .Any(i => prefabObjects.GetObject(true, i) == prefabNetworkObject);
       if (!isRegistered)
       {
         prefabObjects.AddObject(prefabNetworkObject);
-        Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId} in NetworkManager SpawnablePrefabs.");
+        Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId}.");
       }
       else
       {
-        Debug.Log($"VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId} already registered.");
+        Debug.Log($"VolumeRenderedObjectPrefab PrefabId={prefabNetworkObject.PrefabId} already registered.");
       }
     }
     else
@@ -112,102 +118,55 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  /// <summary>
-  /// Server RPC to request loading a new dataset + update the networked volumetric object. -- Not currently used
-  /// </summary>
-  /// <param name="newDatasetPath">(string): Path to the new dataset.</param>
-  /// <param name="position">(Vector3): Desired position for the volume.</param>
-  /// <param name="rotation">(Quaternion): Desired rotation for the volume.</param>
-  /// <param name="conn">(NetworkConnection, optional): Specific client connection (null for all clients).</param>
-  /// <returns></returns>
   [ServerRpc(RequireOwnership = false)]
   public void RequestLoadVolumeData(string newDatasetPath, Vector3 position, Quaternion rotation, NetworkConnection conn = null)
   {
-    // Update dataset path and network object
     datasetPath = newDatasetPath;
     if (!isVolumeSpawned)
     {
       StartCoroutine(NetworkVolumeObject(position, rotation));
     }
-    // Send TargetRpc to each client
-    foreach (NetworkConnection clientConn in NetworkManager.ClientManager.Clients.Values)
-    {
-      TargetAssignLocalDataset(clientConn, datasetPath, position, rotation);
-    }
   }
 
-  /// <summary>
-  /// Target RPC sent from server to a specific client to load the dataset and synchronize the volume.
-  /// </summary>
-  /// <param name="conn">(NetworkConnection): Target client’s connection.</param>
-  /// <param name="datasetPath">(string): Path to the dataset to load.</param>
-  /// <param name="position">(Vector3): Volume position.</param>
-  /// <param name="rotation">(Quaternion): Volume rotation.</param>
-  /// <returns></returns>
-  [TargetRpc]
-  private void TargetAssignLocalDataset(NetworkConnection conn, string datasetPath, Vector3 position, Quaternion rotation)
-  {
-    StartCoroutine(AssignLocalDataset(datasetPath, position, rotation));
-  }
-
-  /// <summary>
-  /// Instantiate, configure, and spawn the VolumeRenderedObject on the server.
-  /// </summary>
-  /// <param name="position">(Vector3? -> nullable): Optional position. Defaults to defaultPosition.</param>
-  /// <param name="rotation">(Quaternion? -> nullable): Optional rotation. Defaults to defaultRotation.</param>
-  /// <returns></returns>
   private System.Collections.IEnumerator NetworkVolumeObject(Vector3? position = null, Quaternion? rotation = null)
   {
-    if (isVolumeSpawned) // To prevent multiple spawns
+    if (isVolumeSpawned)
     {
-      Debug.LogWarning("Volume already spawned on server, skipping NetworkVolumeObject.");
+      Debug.LogWarning("Volume already spawned on server.");
       yield break;
     }
 
-    // Destroy existing VolumeRenderedObjects
     foreach (var existingObj in FindObjectsOfType<VolumeRenderedObject>())
     {
       if (existingObj.gameObject != gameObject)
       {
-        Debug.Log($"Destroying existing VolumeRenderedObject: {existingObj.gameObject.name}");
+        Debug.Log($"Removing existing VolumeRenderedObject: {existingObj.gameObject.name}");
         ServerManager.Despawn(existingObj.gameObject);
       }
     }
 
-    // Check prefab
+    RegisterPrefab();
+
     if (volumeRenderedObjectPrefab == null)
     {
-      Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker!");
+      Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker.");
       yield break;
     }
 
-    // Determine dataset path (Editor or Build version)
-    string fullPath;
-    if (Application.isEditor)
-    {
-      fullPath = Path.Combine(Application.dataPath, datasetPath);
-    }
-    else
-    {
-      fullPath = Path.Combine(Application.streamingAssetsPath, datasetPath);
-    }
-
-    // Check dataset file
+    string fullPath = Application.isEditor ? Path.Combine(Application.dataPath, datasetPath) : Path.Combine(Application.streamingAssetsPath, datasetPath);
     if (!File.Exists(fullPath))
     {
-      Debug.LogError($"Volumetric dataset file not found at {fullPath}.");
+      Debug.LogError($"Volumetric dataset file not found: {fullPath}");
       yield break;
     }
 
-    // Check for .ini file (only .raw files)
     string iniPath = Path.ChangeExtension(fullPath, ".ini");
-    // Default .raw params according to plugin docs
     int dimX = 128, dimY = 256, dimZ = 256;
     DataContentFormat format = DataContentFormat.Uint8;
     Endianness endianness = Endianness.LittleEndian;
     int bytesToSkip = 0;
 
-    if (File.Exists(iniPath)) // parse contents of .ini file
+    if (File.Exists(iniPath))
     {
       try
       {
@@ -217,45 +176,54 @@ public class VolumeDataNetworker : NetworkBehaviour
           if (line.StartsWith("dimX=")) dimX = int.Parse(line.Split('=')[1]);
           else if (line.StartsWith("dimY=")) dimY = int.Parse(line.Split('=')[1]);
           else if (line.StartsWith("dimZ=")) dimZ = int.Parse(line.Split('=')[1]);
-          else if (line.StartsWith("format=")) format = (DataContentFormat)System.Enum.Parse(typeof(DataContentFormat), line.Split('=')[1]);
-          else if (line.StartsWith("endianness=")) endianness = (Endianness)System.Enum.Parse(typeof(Endianness), line.Split('=')[1]);
+          else if (line.StartsWith("format=")) format = (DataContentFormat)Enum.Parse(typeof(DataContentFormat), line.Split('=')[1]);
+          else if (line.StartsWith("endianness=")) endianness = (Endianness)Enum.Parse(typeof(Endianness), line.Split('=')[1]);
           else if (line.StartsWith("skipBytes=")) bytesToSkip = int.Parse(line.Split('=')[1]);
         }
         Debug.Log($"Loaded .ini file parameters: dimX={dimX}, dimY={dimY}, dimZ={dimZ}, format={format}, endianness={endianness}, skipBytes={bytesToSkip}");
       }
-      catch (System.Exception e)
+      catch (Exception e)
       {
         Debug.LogWarning($"Failed to parse .ini file at {iniPath}: {e.Message}. Using default parameters.");
       }
     }
 
-    // Load dataset
     RawDatasetImporter importer = new RawDatasetImporter(fullPath, dimX, dimY, dimZ, format, endianness, bytesToSkip);
     VolumeDataset dataset = importer.Import();
     if (dataset == null)
     {
-      Debug.LogError($"Server failed to import dataset from {fullPath}. Check dimensions ({dimX}x{dimY}x{dimZ}), format ({format}) and endianness ({endianness}).");
+      Debug.LogError($"Server failed to import dataset from {fullPath}. Check dimensions ({dimX}x{dimY}x{dimZ}), format ({format}), endianness ({endianness}).");
       yield break;
     }
 
-    // Instantiate prefab
+    byte[] serializedData = DatasetSerializer.Serialize(dataset);
+    if (serializedData == null)
+    {
+      Debug.LogError("Failed to serialize dataset.");
+      yield break;
+    }
+    dataChunks = DatasetSerializer.ChunkData(serializedData);
+    if (dataChunks == null || dataChunks.Length == 0)
+    {
+      Debug.LogError("Failed to chunk serialized data.");
+      yield break;
+    }
+    Debug.Log($"Server ready to send {dataChunks.Length} chunks ({serializedData.Length / 1024f / 1024f:F2} MB) to clients. Connected clients: {ServerManager.Clients.Count}");
+
     GameObject volumeGameObject = Instantiate(volumeRenderedObjectPrefab);
     volumeObject = volumeGameObject.GetComponent<VolumeRenderedObject>();
     if (volumeObject == null)
     {
       volumeObject = volumeGameObject.AddComponent<VolumeRenderedObject>();
+      Debug.LogWarning("VolumeRenderedObject component missing on prefab. Added dynamically.");
     }
 
-    // Assign dataset
     volumeObject.dataset = dataset;
-
-    // Normalize scale (mimicking VolumeObjectFactory)
     float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-    volumeGameObject.transform.localScale = Vector3.one / maxScale; // TODO: Adjust for visibility
+    volumeGameObject.transform.localScale = Vector3.one / maxScale;
     volumeGameObject.transform.position = position ?? defaultPosition;
     volumeGameObject.transform.rotation = rotation ?? defaultRotation;
 
-    // Verify NetworkObject
     NetworkObject networkObject = volumeGameObject.GetComponent<NetworkObject>();
     if (networkObject == null)
     {
@@ -264,7 +232,6 @@ public class VolumeDataNetworker : NetworkBehaviour
       yield break;
     }
 
-    // Verify VolumeContainer
     Transform volumeContainer = volumeGameObject.transform.Find("VolumeContainer");
     MeshRenderer meshRenderer = null;
     if (volumeContainer != null)
@@ -311,22 +278,21 @@ public class VolumeDataNetworker : NetworkBehaviour
       container.transform.localScale = Vector3.one;
       MeshFilter meshFilter = container.AddComponent<MeshFilter>();
       meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().mesh;
-      Destroy(GameObject.Find("Cube")); // Remove temporary cube
+      Destroy(GameObject.Find("Cube"));
       meshRenderer = container.AddComponent<MeshRenderer>();
       Shader volumeShader = Shader.Find(DVRShaderName);
       if (volumeShader != null)
       {
         meshRenderer.material = new Material(volumeShader);
-        Debug.Log($"Applied shader {DVRShaderName}.");
+        Debug.Log($"Applied {DVRShaderName} shader.");
       }
       else
       {
-        Debug.LogWarning($"Shader {DVRShaderName} not found. Using Standard shader as fallback.");
+        Debug.LogWarning($"Shader {DVRShaderName} not found.");
         meshRenderer.material = new Material(Shader.Find("Standard"));
       }
     }
 
-    // Set up material properties
     if (meshRenderer != null && meshRenderer.sharedMaterial != null)
     {
       Texture3D dataTexture = dataset.GetDataTexture();
@@ -353,7 +319,6 @@ public class VolumeDataNetworker : NetworkBehaviour
         Debug.LogWarning("Failed to get transfer function texture.");
       }
 
-      // Generate noise texture
       const int noiseDimX = 512;
       const int noiseDimY = 512;
       Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
@@ -367,34 +332,40 @@ public class VolumeDataNetworker : NetworkBehaviour
         Debug.LogWarning("Failed to generate noise texture.");
       }
 
-      // Set shader keywords
       meshRenderer.sharedMaterial.EnableKeyword("MODE_DVR");
       meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
       meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
-
-      // Assign meshRenderer to VolumeRenderedObject
       volumeObject.meshRenderer = meshRenderer;
     }
 
-    // Set initial render settings
     volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
-    volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f)); // Adjusted for VisMale.raw range (1-254)
+    volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
     volumeObject.UpdateMaterialProperties();
 
     Debug.Log($"Server loaded dataset from {fullPath} with dimensions {dimX}x{dimY}x{dimZ}");
 
-    // Spawn on server
     ServerManager.Spawn(volumeGameObject);
     isVolumeSpawned = true;
     Debug.Log($"Server spawned VolumeRenderedObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={fullPath}");
 
-    // Wait to ensure volume is networked
+    if (ServerManager.Clients.Count > 0)
+    {
+      foreach (NetworkConnection clientConn in ServerManager.Clients.Values)
+      {
+        Debug.Log($"Starting transmission to client {clientConn.ClientId}");
+        StartCoroutine(SendDatasetToClient(clientConn, dataChunks));
+      }
+    }
+    else
+    {
+      Debug.Log("No clients connected. Dataset chunks stored for future connections.");
+    }
+
     yield return new WaitForSeconds(0.1f);
 
-    // Spawn canvas
     if (isCanvasSpawned)
     {
-      Debug.LogWarning("Canvas already spawned on server, skipping canvas spawning.");
+      Debug.LogWarning("Canvas already spawned on server.");
     }
     else
     {
@@ -428,23 +399,71 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  /// <summary>
-  /// Load the dataset on the client (or server) and assign it to the networked VolumeRenderedObject placeholder prefab (since FishNet *needs* all clients to have the same list of SpawnablePrefabs).
-  /// </summary>
-  /// <param name="datasetPath">(string -> nullable): Path to the dataset Defaults to this.datasetPath if null.</param>
-  /// <param name="position">(Vector3? -> nullable): Optional position. Defaults to defaultPosition if null.</param>
-  /// <param name="rotation">(Quaternion? -> nullable): Optional rotation. Defaults to defaultRotation if null.</param>
-  /// <returns></returns>
-  private System.Collections.IEnumerator AssignLocalDataset(string datasetPath = null, Vector3? position = null, Quaternion? rotation = null)
+  private System.Collections.IEnumerator SendDatasetToClient(NetworkConnection conn, byte[][] dataChunks)
+  {
+    if (dataChunks == null || dataChunks.Length == 0)
+    {
+      Debug.LogError($"No chunks to send to client {conn.ClientId}.");
+      yield break;
+    }
+
+    for (int i = 0; i < dataChunks.Length; i++)
+    {
+      if (dataChunks[i] == null || dataChunks[i].Length == 0)
+      {
+        Debug.LogError($"Invalid chunk {i}/{dataChunks.Length} for client {conn.ClientId}.");
+        continue;
+      }
+      Debug.Log($"Sending chunk {i}/{dataChunks.Length}, size={dataChunks[i].Length} bytes to client {conn.ClientId}");
+      TargetSendDatasetChunk(conn, i, dataChunks.Length, dataChunks[i]);
+      yield return new WaitForSeconds(0.1f);
+    }
+  }
+
+  [TargetRpc]
+  private void TargetSendDatasetChunk(NetworkConnection conn, int chunkIndex, int totalChunks, byte[] chunk)
+  {
+    if (!IsServer)
+    {
+      StartCoroutine(ReceiveDatasetChunk(chunkIndex, totalChunks, chunk));
+    }
+  }
+
+  private System.Collections.IEnumerator ReceiveDatasetChunk(int chunkIndex, int totalChunks, byte[] chunk)
+  {
+    if (!chunkStorage.ContainsKey(NetworkManager.ClientManager.Connection))
+    {
+      chunkStorage[NetworkManager.ClientManager.Connection] = new byte[totalChunks][];
+    }
+    chunkStorage[NetworkManager.ClientManager.Connection][chunkIndex] = chunk;
+    Debug.Log($"Client received chunk {chunkIndex}/{totalChunks}, size={chunk.Length} bytes");
+
+    if (chunkStorage[NetworkManager.ClientManager.Connection].All(c => c != null))
+    {
+      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[NetworkManager.ClientManager.Connection]);
+      VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData);
+      chunkStorage.Remove(NetworkManager.ClientManager.Connection);
+
+      if (dataset == null)
+      {
+        Debug.LogError("Client failed to deserialize dataset.");
+        yield break;
+      }
+
+      StartCoroutine(AssignLocalDataset(dataset, null, null));
+    }
+    yield return null;
+  }
+
+  private System.Collections.IEnumerator AssignLocalDataset(VolumeDataset dataset = null, Vector3? position = null, Quaternion? rotation = null)
   {
     NetworkObject networkObject = null;
     volumeObject = null;
 
-    // Wait for server to spawn networked object
     if (!IsServer)
     {
       int retryCount = 0;
-      const int maxRetries = 60; // Wait up to 60*0.5 = 30 seconds
+      const int maxRetries = 60;
       while (networkObject == null && retryCount < maxRetries)
       {
         NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
@@ -452,10 +471,10 @@ public class VolumeDataNetworker : NetworkBehaviour
         networkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId);
         if (networkObject == null)
         {
-          Debug.Log($"Client waiting for networked VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}. Found {networkObjects.Length} NetworkObjects. Expected PrefabId={expectedPrefabId}, datasetPath={datasetPath}");
+          Debug.Log($"Client waiting for networked VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}. Expected PrefabId={expectedPrefabId}");
           foreach (NetworkObject nob in networkObjects)
           {
-            Debug.Log($"Client: Found NetworkObject - ObjectId={nob.ObjectId}, PrefabId={nob.PrefabId}, Name={nob.gameObject.name}, HasVolumeContainer={nob.transform.Find("VolumeContainer") != null}, HasNetworkTransform={nob.GetComponent<NetworkTransform>() != null}, HasMeshRenderer={nob.GetComponentInChildren<MeshRenderer>() != null}, HasVolumeRenderedObject={nob.GetComponent<VolumeRenderedObject>() != null}");
+            Debug.Log($"Client: Found NetworkObject: ObjectId={nob.ObjectId}, PrefabId={nob.PrefabId}, Name={nob.gameObject.name}, HasVolumeContainer={nob.transform.Find("VolumeContainer") != null}, HasNetworkTransform={nob.GetComponent<NetworkTransform>() != null}, HasMeshRenderer={nob.GetComponentInChildren<MeshRenderer>() != null}, HasVolumeRenderedObject={nob.GetComponent<VolumeRenderedObject>() != null}");
           }
           retryCount++;
           yield return new WaitForSeconds(0.5f);
@@ -465,110 +484,52 @@ public class VolumeDataNetworker : NetworkBehaviour
           volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
           if (volumeObject == null)
           {
-            Debug.LogWarning($"Client: VolumeRenderedObject component missing on correct NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Adding component.");
+            Debug.LogWarning($"Client: VolumeRenderedObject component missing on NetworkObject (ObjectId={networkObject.ObjectId}). Adding dynamically.");
             volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
           }
           Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
           if (volumeContainer == null)
           {
-            Debug.LogError($"Client: VolumeContainer child missing on correct NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}). Ensure the prefab has VolumeContainer child attached on both host and client.");
+            Debug.LogError($"Client: VolumeContainer child missing on NetworkObject (ObjectId={networkObject.ObjectId}).");
             yield break;
           }
-          Debug.Log($"Client found correct NetworkObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Name={networkObject.gameObject.name}, HasVolumeRenderedObject={volumeObject != null}, HasVolumeContainer={volumeContainer != null}, HasMeshRenderer={networkObject.GetComponentInChildren<MeshRenderer>() != null}");
+          Debug.Log($"Client found NetworkObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
         }
       }
 
       if (networkObject == null || volumeObject == null)
       {
-        Debug.LogError($"Client failed to find or initialize networked VolumeRenderedObject after {maxRetries} retries. Expected PrefabId={volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId}, datasetPath={datasetPath}. Ensure prefab is added to NetworkManager's SpawnablePrefabs in editor on both host and client with matching PrefabId (set manually to 100 in NetworkObject component if needed).");
+        Debug.LogError($"Client failed to find VolumeRenderedObject after {maxRetries} retries. Expected PrefabId={volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId}.");
         yield break;
       }
     }
     else
     {
-      // For server, volumeObject should already be set in NetworkVolumeObject
       if (volumeObject == null)
       {
-        Debug.LogError("Server: VolumeRenderedObject not set before AssignLocalDataset.");
+        Debug.LogError("Server: VolumeRenderedObject not set.");
         yield break;
       }
       networkObject = volumeObject.GetComponent<NetworkObject>();
       if (networkObject == null)
       {
-        Debug.LogError("Server: VolumeRenderedObject missing NetworkObject component.");
+        Debug.LogError("Server: VolumeRenderedObject missing NetworkObject.");
         yield break;
       }
       Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
       if (volumeContainer == null)
       {
-        Debug.LogError($"Server: VolumeContainer child missing on VolumeRenderedObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}). Ensure the prefab has VolumeContainer child attached.");
+        Debug.LogError($"Server: VolumeContainer child missing on VolumeRenderedObject (ObjectId={networkObject.ObjectId}).");
         yield break;
       }
     }
 
-    // Load local dataset if not already loaded
-    string fullPath;
-    if (Application.isEditor)
+    if (dataset != null && volumeObject.dataset == null)
     {
-      fullPath = Path.Combine(Application.dataPath, datasetPath ?? this.datasetPath);
-    }
-    else
-    {
-      fullPath = Path.Combine(Application.streamingAssetsPath, datasetPath ?? this.datasetPath);
-    }
-
-    if (!File.Exists(fullPath))
-    {
-      Debug.LogError($"Dataset file not found at {fullPath}. Ensure VisMale.raw is in Assets/StreamingAssets/EasyVolumeRendering/DataFiles/ for builds.");
-      yield break;
-    }
-
-    // Check for .ini file
-    string iniPath = Path.ChangeExtension(fullPath, ".ini");
-    int dimX = 128, dimY = 256, dimZ = 256;
-    DataContentFormat format = DataContentFormat.Uint8;
-    Endianness endianness = Endianness.LittleEndian;
-    int bytesToSkip = 0;
-
-    if (File.Exists(iniPath))
-    {
-      try
-      {
-        string[] iniLines = File.ReadAllLines(iniPath);
-        foreach (string line in iniLines)
-        {
-          if (line.StartsWith("dimX=")) dimX = int.Parse(line.Split('=')[1]);
-          else if (line.StartsWith("dimY=")) dimY = int.Parse(line.Split('=')[1]);
-          else if (line.StartsWith("dimZ=")) dimZ = int.Parse(line.Split('=')[1]);
-          else if (line.StartsWith("format=")) format = (DataContentFormat)Enum.Parse(typeof(DataContentFormat), line.Split('=')[1]);
-          else if (line.StartsWith("endianness=")) endianness = (Endianness)Enum.Parse(typeof(Endianness), line.Split('=')[1]);
-          else if (line.StartsWith("skipBytes=")) bytesToSkip = int.Parse(line.Split('=')[1]);
-        }
-        Debug.Log($"Client loaded .ini file parameters: dimX={dimX}, dimY={dimY}, dimZ={dimZ}, format={format}, endianness={endianness}, skipBytes={bytesToSkip}");
-      }
-      catch (Exception e)
-      {
-        Debug.LogWarning($"Client failed to parse .ini file at {iniPath}: {e.Message}. Using default parameters.");
-      }
-    }
-
-    if (volumeObject.dataset == null)
-    {
-      RawDatasetImporter importer = new RawDatasetImporter(fullPath, dimX, dimY, dimZ, format, endianness, bytesToSkip);
-      VolumeDataset dataset = importer.Import();
-      if (dataset == null)
-      {
-        Debug.LogError($"Client failed to import dataset from {fullPath}. Check dimensions ({dimX}x{dimY}x{dimZ}), format ({format}), endianness ({endianness}), and file size (8388608 bytes).");
-        yield break;
-      }
-
       volumeObject.dataset = dataset;
-
-      // Normalise scale
       float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
       volumeObject.transform.localScale = Vector3.one / maxScale;
 
-      // Verify VolumeContainer
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer");
       MeshRenderer meshRenderer = null;
       if (volumeContainer != null)
@@ -582,32 +543,31 @@ public class VolumeDataNetworker : NetworkBehaviour
             Debug.LogWarning($"Client: VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected {DVRShaderName}. Updating material.");
             meshRenderer.sharedMaterial = new Material(volumeShader);
           }
-          Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}, Material name: {meshRenderer.sharedMaterial.name}");
+          Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
         }
         else
         {
-          Debug.LogError($"Client: VolumeContainer missing MeshRenderer or material on NetworkObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}). Ensure prefab has VolumeContainer with MeshRenderer and material set.");
+          Debug.LogError($"Client: VolumeContainer missing MeshRenderer or material.");
           yield break;
         }
       }
       else
       {
-        Debug.LogError($"Client: VolumeContainer child not found in VolumeRenderedObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}). Ensure prefab has VolumeContainer child attached.");
+        Debug.LogError($"Client: VolumeContainer child not found.");
         yield break;
       }
 
-      // Set up material properties
       if (meshRenderer != null && meshRenderer.sharedMaterial != null)
       {
         Texture3D dataTexture = dataset.GetDataTexture();
         if (dataTexture != null)
         {
           meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
-          Debug.Log($"Client: Assigned dataset texture to material.");
+          Debug.Log($"Client: Assigned dataset texture.");
         }
         else
         {
-          Debug.LogWarning("Client: Failed to get dataset texture for VolumeContainer material.");
+          Debug.LogWarning("Client: Failed to get dataset texture.");
         }
 
         UnityVolumeRendering.TransferFunction tf = TransferFunctionDatabase.CreateTransferFunction();
@@ -616,57 +576,43 @@ public class VolumeDataNetworker : NetworkBehaviour
         if (tfTexture != null)
         {
           meshRenderer.sharedMaterial.SetTexture("_TFTex", tfTexture);
-          Debug.Log($"Client: Assigned transfer function texture to material.");
+          Debug.Log($"Client: Assigned transfer function texture.");
         }
         else
         {
           Debug.LogWarning("Client: Failed to get transfer function texture.");
         }
 
-        // Generate noise texture
         const int noiseDimX = 512;
         const int noiseDimY = 512;
         Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
         if (noiseTexture != null)
         {
           meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture);
-          Debug.Log($"Client: Assigned noise texture to material.");
+          Debug.Log($"Client: Assigned noise texture.");
         }
         else
         {
           Debug.LogWarning("Client: Failed to generate noise texture.");
         }
 
-        // Set shader keywords
         meshRenderer.sharedMaterial.EnableKeyword("MODE_DVR");
         meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
         meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
-
-        // Assign meshRenderer to VolumeRenderedObject
         volumeObject.meshRenderer = meshRenderer;
       }
 
       volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
-      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f)); // Adjusted for VisMale.raw range (1-254)
+      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
       volumeObject.UpdateMaterialProperties();
 
-      Debug.Log($"Client assigned local dataset to networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Path={fullPath}");
-    }
-    else
-    {
-      Debug.Log($"Client used existing dataset in networked object, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
+      Debug.Log($"Client assigned dataset to ObjectId={networkObject.ObjectId}");
     }
 
-    // Ensure position, rotation
     volumeObject.transform.position = position ?? defaultPosition;
     volumeObject.transform.rotation = rotation ?? defaultRotation;
   }
 
-  /// <summary>
-  /// Server RPC to handle a Client’s request for the current dataset and volume state.
-  /// </summary>
-  /// <param name="conn">(NetworkConnection): The requesting client’s connection.</param>
-  /// <returns></returns>
   [ServerRpc(RequireOwnership = false)]
   private void RequestCurrentDatasetServerRpc(NetworkConnection conn)
   {
@@ -675,8 +621,24 @@ public class VolumeDataNetworker : NetworkBehaviour
       NetworkObject networkObject = volumeObject.GetComponent<NetworkObject>();
       if (networkObject != null)
       {
-        Debug.Log($"Server: Notifying client {conn.ClientId} of current dataset: {datasetPath}, ObjectId={networkObject.ObjectId}");
-        TargetAssignLocalDataset(conn, datasetPath, volumeObject.transform.position, volumeObject.transform.rotation);
+        byte[] serializedData = DatasetSerializer.Serialize(volumeObject.dataset);
+        if (serializedData != null)
+        {
+          byte[][] chunks = DatasetSerializer.ChunkData(serializedData);
+          if (chunks != null && chunks.Length > 0)
+          {
+            StartCoroutine(SendDatasetToClient(conn, chunks));
+            Debug.Log($"Server: Sending dataset to client {conn.ClientId}, ObjectId={networkObject.ObjectId}");
+          }
+          else
+          {
+            Debug.LogError($"Server: Failed to chunk dataset for client {conn.ClientId}");
+          }
+        }
+        else
+        {
+          Debug.LogError($"Server: Failed to serialize dataset for client {conn.ClientId}");
+        }
       }
       else
       {
