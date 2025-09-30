@@ -31,7 +31,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
   [SerializeField] public GameObject volumeRenderedObjectPrefab; // Public for VolumeDataControlUI
-  [SerializeField] private GameObject volumeControlCanvasPrefab;
+  [SerializeField] public GameObject volumeControlCanvasPrefab; // Public for OwnershipManager
 
   private VolumeRenderedObject volumeObject;
   private GameObject canvasObject;

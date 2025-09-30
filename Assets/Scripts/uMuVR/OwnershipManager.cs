@@ -5,6 +5,9 @@ using TriInspector;
 using UltimateXR.Manipulation;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
+// MY EDIT
+using System.Linq;
+//
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -30,11 +33,17 @@ namespace uMuVR {
 		public UxrGrabbableObject UXRinteractable = null;
 		[PropertyTooltip("Number of ticks to wait before an ownership transfer can occur again")]
 		public uint ownershipTransferCooldown = 10;
-		
-		/// <summary>
-		/// Counter tracking how many controllers are actively selecting us
-		/// </summary>
-		private uint selectionCount = 0;
+
+    // MY EDITS
+    [PropertyTooltip("Reference to VolumeDataNetworker to find the canvas")]
+    [ShowIf(nameof(enableInteractionTransfer)), PropertyOrder(3)]
+    public VolumeDataNetworker volumeDataNetworker = null;
+    //
+
+    /// <summary>
+    /// Counter tracking how many controllers are actively selecting us
+    /// </summary>
+    private uint selectionCount = 0;
 		/// <summary>
 		/// Property indicating if we are actively selected
 		/// </summary>
@@ -98,11 +107,38 @@ namespace uMuVR {
 		/// When the owner of this object leaves, return control of it to the scene
 		/// </summary>
 		public void OnPreDestroyClientObjects(NetworkConnection leaving) {
-			if (leaving != Owner) return;
+      // MY EDIT
+      if (leaving != Owner) return;
 
-			if (releaseOwnershipOnLeave)
-				GiveOwnership(null);
-		}
+      if (releaseOwnershipOnLeave)
+      {
+        GiveOwnership(null);
+        if (volumeDataNetworker != null)
+        {
+          NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
+          int expectedPrefabId = volumeDataNetworker.volumeControlCanvasPrefab?.GetComponent<NetworkObject>()?.PrefabId ?? -1;
+          NetworkObject canvasNetworkObject = null;
+          if (expectedPrefabId != -1)
+          {
+            canvasNetworkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId && nob.GetComponent<VolumeDataControlUI>() != null);
+          }
+
+          if (canvasNetworkObject != null)
+          {
+            canvasNetworkObject.GiveOwnership(null);
+            Debug.Log($"OwnershipManager: Released canvas ownership to scene for client {leaving.ClientId}, ObjectId={canvasNetworkObject.ObjectId}");
+          }
+          else
+          {
+            Debug.LogWarning($"OwnershipManager: Failed to find canvas to release ownership for client {leaving.ClientId}, PrefabId={expectedPrefabId}");
+          }
+        }
+      }
+      //if (leaving != Owner) return;
+
+      //if (releaseOwnershipOnLeave)
+      //	GiveOwnership(null);
+    }
 
 		
 		/// <summary>
@@ -115,7 +151,10 @@ namespace uMuVR {
 				XRIinteractable = GetComponent<XRBaseInteractable>();
 			if (enableInteractionTransfer && UXRinteractable is null)
 				UXRinteractable = GetComponent<UxrGrabbableObject>();
-		}
+			// MY EDIT
+      if (enableInteractionTransfer && volumeDataNetworker == null)
+        volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
+    }
 
 		
 		/// <summary>
@@ -126,10 +165,14 @@ namespace uMuVR {
 			// NOTE: beware of NetworkObjects that may be in the way of the user representation that we are looking for
 			// there was a NetworkObject on the XRRig at some point which broke this whole function
 			var no = e.interactorObject.transform.GetComponentInParent<NetworkObject>();
-			if (no is null) return;
+      if (no is null) return;
 
 			GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
-			selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
+      // MY EDIT
+      Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, transferring ownership.");
+      TransferCanvasOwnership(no.Owner);
+      //
+      selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
 		}
 
 		protected void OnUxrInteractableSelected(object sender, UxrManipulationEventArgs args) {
@@ -137,10 +180,16 @@ namespace uMuVR {
 			// there was a NetworkObject on the XRRig at some point which broke this whole function
 			var no = args.Grabber.transform.GetComponentInParent<NetworkObject>();
 			if (no is null) return;
-			
-			selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
-			GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
-		}
+
+      // MY EDIT
+      Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, transferring ownership.");
+      GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
+      TransferCanvasOwnership(no.Owner);
+      selectionCount++;
+      //selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
+      //GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
+      //
+    }
 
 		/// <summary>
 		/// When interaction with this object ceases, decrement the number of selections
@@ -176,9 +225,38 @@ namespace uMuVR {
 			// Be sure to listen for changes in ownership
 			ov.RegisterAsListener(this);
 		}
-		
-		
-		
+    // MY EDIT
+    private void TransferCanvasOwnership(NetworkConnection newOwner)
+    {
+      if (volumeDataNetworker == null)
+      {
+        Debug.LogWarning("OwnershipManager: volumeDataNetworker is null, cannot transfer canvas ownership.");
+        return;
+      }
+
+      // Find the instantiated canvas by matching PrefabId
+      NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
+      NetworkObject canvasNetworkObject = null;
+      int expectedPrefabId = volumeDataNetworker.volumeControlCanvasPrefab?.GetComponent<NetworkObject>()?.PrefabId ?? -1;
+      if (expectedPrefabId != -1)
+      {
+        canvasNetworkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId && nob.GetComponent<VolumeDataControlUI>() != null);
+      }
+
+      if (canvasNetworkObject == null)
+      {
+        Debug.LogWarning($"OwnershipManager: Failed to find instantiated canvas with PrefabId={expectedPrefabId}. Found {networkObjects.Length} NetworkObjects.");
+        return;
+      }
+
+      if (canvasNetworkObject.Owner != newOwner)
+      {
+        canvasNetworkObject.GiveOwnership(newOwner);
+        Debug.Log($"OwnershipManager: Transferred canvas ownership to client {newOwner?.ClientId ?? -1}, ObjectId={canvasNetworkObject.ObjectId}, PrefabId={canvasNetworkObject.PrefabId}");
+      }
+    }
+    /////
+
 #if UNITY_EDITOR
 		// Function to add all of the necessary components for an object to be networked (visible in the UxrGrabbableObject and OwnershipManager) 
 		[MenuItem("CONTEXT/UxrGrabbableObject/Make Networked")]
@@ -198,5 +276,5 @@ namespace uMuVR {
         	if (rb is not null) nrb ??= go.gameObject.AddComponent<NetworkRigidbody>();
         }
 #endif
-	}
+  }
 }

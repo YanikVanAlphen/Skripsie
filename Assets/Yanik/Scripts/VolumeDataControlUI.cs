@@ -32,15 +32,15 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void Start()
   {
-    if (volumeDataNetworker != null)
-    {
-      StartCoroutine(FindVolumeObject());
-    }
-    else
+    if (volumeDataNetworker == null)
     {
       Debug.LogError("VolumeDataNetworker not assigned in VolumeDataControlUI.");
+      return;
     }
-    if (positionIncrementButton == null) // because for some reason the buttons do not want to assign
+
+    StartCoroutine(FindVolumeObject());
+
+    if (positionIncrementButton == null)
       positionIncrementButton = GameObject.Find("position_pos_btn")?.GetComponent<Button>();
     if (positionDecrementButton == null)
       positionDecrementButton = GameObject.Find("position_neg_btn")?.GetComponent<Button>();
@@ -74,7 +74,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   private System.Collections.IEnumerator FindVolumeObject()
   {
     int retryCount = 0;
-    const int maxRetries = 60;
+    const int maxRetries = 120; // Increased to 60s
     while (volumeObject == null && retryCount < maxRetries)
     {
       if (volumeDataNetworker != null && volumeDataNetworker.volumeRenderedObjectPrefab != null)
@@ -87,13 +87,25 @@ public class VolumeDataControlUI : NetworkBehaviour
           volumeObject = targetNetObj.GetComponent<VolumeRenderedObject>();
           if (volumeObject != null)
           {
-            Debug.Log($"VolumeDataControlUI: Found volumeObject, ObjectId={targetNetObj.ObjectId}");
+            Debug.Log($"VolumeDataControlUI: Found volumeObject, ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId}");
+          }
+          else
+          {
+            Debug.LogWarning($"VolumeDataControlUI: NetworkObject found (ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId}) but missing VolumeRenderedObject component.");
           }
         }
+        else
+        {
+          Debug.Log($"VolumeDataControlUI: Waiting for VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}, Expected PrefabId={expectedPrefabId}, Found NetworkObjects={networkObjects.Length}");
+        }
       }
+      else
+      {
+        Debug.LogWarning($"VolumeDataControlUI: volumeDataNetworker or volumeRenderedObjectPrefab is null. Networker={volumeDataNetworker != null}, Prefab={(volumeDataNetworker != null ? volumeDataNetworker.volumeRenderedObjectPrefab != null : false)}");
+      }
+
       if (volumeObject == null)
       {
-        Debug.Log($"VolumeDataControlUI: Waiting for VolumeRenderedObject... Attempt {retryCount + 1}/{maxRetries}");
         retryCount++;
         yield return new WaitForSeconds(0.5f);
       }
@@ -101,7 +113,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     if (volumeObject == null)
     {
-      Debug.LogError("VolumeDataControlUI: Failed to find VolumeRenderedObject after max retries.");
+      Debug.LogError($"VolumeDataControlUI: Failed to find VolumeRenderedObject after {maxRetries} retries.");
     }
   }
 
@@ -109,27 +121,20 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     base.OnOwnershipClient(prevOwner);
     UpdateInteractableState();
+    if (IsOwner && volumeObject != null)
+    {
+      NetworkObject volumeNetworkObject = volumeObject.GetComponent<NetworkObject>();
+      if (volumeNetworkObject != null && volumeNetworkObject.Owner != Owner)
+      {
+        volumeNetworkObject.GiveOwnership(Owner);
+        Debug.Log($"VolumeDataControlUI: Transferred VolumeRenderedObject ownership to client {Owner.ClientId}, ObjectId={volumeNetworkObject.ObjectId}");
+      }
+    }
   }
 
   private void UpdateInteractableState()
   {
-    bool isOwner = false;
-    if (volumeObject != null)
-    {
-      NetworkObject volumeNetworkObject = volumeObject.GetComponent<NetworkObject>();
-      if (volumeNetworkObject != null)
-      {
-        isOwner = volumeNetworkObject.IsOwner || IsServer;
-      }
-      else
-      {
-        Debug.LogWarning("VolumeDataControlUI: volumeObject missing NetworkObject component.");
-      }
-    }
-    else
-    {
-      Debug.LogWarning("VolumeDataControlUI: volumeObject is null, setting UI to non-interactable.");
-    }
+    bool isOwner = IsOwner || IsServer;
 
     if (positionAxisDropdown != null)
       positionAxisDropdown.interactable = isOwner;
@@ -146,7 +151,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     if (scaleSlider != null)
       scaleSlider.interactable = isOwner;
 
-    Debug.Log($"VolumeDataControlUI: Interactable={isOwner} for client {NetworkManager.ClientManager.Connection.ClientId}, IsOwner={isOwner}, IsServer={IsServer}");
+    Debug.Log($"VolumeDataControlUI: Interactable={isOwner} for client {NetworkManager.ClientManager.Connection.ClientId}, IsOwner={IsOwner}, IsServer={IsServer}");
   }
 
   private System.Collections.IEnumerator UpdateLabels()
@@ -214,7 +219,13 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     if (!CanInteract())
     {
-      Debug.LogWarning("Cannot adjust position: Not the owner or server.");
+      Debug.LogWarning("Cannot adjust position: Not the owner of the canvas.");
+      return;
+    }
+
+    if (volumeObject == null)
+    {
+      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
       return;
     }
 
@@ -247,7 +258,13 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     if (!CanInteract())
     {
-      Debug.LogWarning("Cannot adjust position: Not the owner or server.");
+      Debug.LogWarning("Cannot adjust position: Not the owner of the canvas.");
+      return;
+    }
+
+    if (volumeObject == null)
+    {
+      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
       return;
     }
 
@@ -266,7 +283,7 @@ public class VolumeDataControlUI : NetworkBehaviour
         break;
       case 2: // z axis
         newPos.z -= positionIncrement;
-        newPos.z = (float)Math.Round(newPos.y, 1);
+        newPos.z = (float)Math.Round(newPos.z, 1);
         break;
     }
 
@@ -280,7 +297,13 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     if (!CanInteract())
     {
-      Debug.LogWarning("Cannot adjust rotation: Not the owner or server.");
+      Debug.LogWarning("Cannot adjust rotation: Not the owner of the canvas.");
+      return;
+    }
+
+    if (volumeObject == null)
+    {
+      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
       return;
     }
 
@@ -320,7 +343,13 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     if (!CanInteract())
     {
-      Debug.LogWarning("Cannot adjust rotation: Not the owner or server.");
+      Debug.LogWarning("Cannot adjust rotation: Not the owner of the canvas.");
+      return;
+    }
+
+    if (volumeObject == null)
+    {
+      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
       return;
     }
 
@@ -360,7 +389,13 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     if (!CanInteract())
     {
-      Debug.LogWarning("Cannot adjust scale: Not the owner or server.");
+      Debug.LogWarning("Cannot adjust scale: Not the owner of the canvas.");
+      return;
+    }
+
+    if (volumeObject == null)
+    {
+      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
       return;
     }
 
@@ -371,7 +406,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     SetScaleServerRpc(value);
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)]
   private void SetPositionServerRpc(Vector3 newPos)
   {
     SetPositionClientRpc(newPos);
@@ -380,14 +415,14 @@ public class VolumeDataControlUI : NetworkBehaviour
   [Client]
   private void SetPositionClientRpc(Vector3 newPos)
   {
-    if (volumeObject != null && !CanInteract())
+    if (volumeObject != null)
     {
       volumeObject.transform.position = newPos;
       Debug.Log($"Client {NetworkManager.ClientManager.Connection.ClientId} updated position to {newPos}.");
     }
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)]
   private void SetScaleServerRpc(float scale)
   {
     SetScaleClientRpc(scale);
@@ -396,14 +431,14 @@ public class VolumeDataControlUI : NetworkBehaviour
   [Client]
   private void SetScaleClientRpc(float scale)
   {
-    if (volumeObject != null && !CanInteract())
+    if (volumeObject != null)
     {
       volumeObject.transform.localScale = new Vector3(scale, scale, scale);
       Debug.Log($"Client {NetworkManager.ClientManager.Connection.ClientId} updated scale to {scale}.");
     }
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)]
   private void SetRotationServerRpc(Quaternion newRot)
   {
     SetRotationClientRpc(newRot);
@@ -412,7 +447,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   [Client]
   private void SetRotationClientRpc(Quaternion newRot)
   {
-    if (volumeObject != null && !CanInteract())
+    if (volumeObject != null)
     {
       volumeObject.transform.rotation = newRot;
       Vector3 euler = newRot.eulerAngles;
@@ -425,13 +460,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private bool CanInteract()
   {
-    if (volumeObject == null)
-    {
-      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
-      return false;
-    }
-    NetworkObject volumeNetworkObject = volumeObject.GetComponent<NetworkObject>();
-    return volumeNetworkObject != null && (volumeNetworkObject.IsOwner || IsServer);
+    return IsOwner || IsServer;
   }
 
   public void SetVolumeDataNetworker(VolumeDataNetworker networker)
