@@ -1,6 +1,7 @@
 using UnityEngine;
 using FishyVoice;
 using Adrenak.UniVoice;
+using Adrenak.UniMic;
 using FishNet.Object;
 using NetworkBehaviour = FishNet.Object.NetworkBehaviour;
 
@@ -27,21 +28,62 @@ public class VoiceAvatar : NetworkBehaviour
       VoiceNetwork voiceNetwork = VoiceNetwork.instance;
       if (voiceNetwork != null)
       {
-        // Create positional audio output factory based on example from FishNet script
-        // agent = voiceNetwork.CreateAgent(new PositionalAudioOutputFactory(maxDistance, rolloffDistance, new PositionalAudioParameters(spatialize, minGain, maxGain, offset, rolloffFactor)));
-        agent = voiceNetwork.CreateAgent(); // default non positional agent for testing
+        // default nonpositional agent for testing
+        agent = voiceNetwork.CreateAgent();
         agent.JoinChatroom(roomName);
-        Debug.Log($"Positional voice agent created and joined {roomName} room for local player.");
+        Debug.Log($"Voice agent created and joined {roomName} room for local player (non-positional).");
+        // microphone status
+        if (Mic.Instance != null)
+        {
+          Debug.Log($"Microphone recording: {Mic.Instance.IsRecording}, Frequency: {Mic.Instance.Frequency}");
+        }
+        else
+        {
+          Debug.LogError("UniMic instance not found!");
+        }
       }
       else
       {
         Debug.LogError("VoiceNetwork instance not found!");
       }
+      // Log AudioSource status
+      var audioSource = GetComponent<AudioSource>();
+      if (audioSource != null)
+      {
+        Debug.Log($"AudioSource found: Enabled={audioSource.enabled}, Output={audioSource.outputAudioMixerGroup}, SpatialBlend={audioSource.spatialBlend}");
+      }
+      else
+      {
+        Debug.LogError("AudioSource component missing on UserAvatar!");
+      }
+      // Log audio output factory
+      if (agent?.AudioOutputFactory != null)
+      {
+        Debug.Log($"AudioOutputFactory: {agent.AudioOutputFactory.GetType().Name}");
+      }
+      else
+      {
+        Debug.LogError("AudioOutputFactory not set on Agent!");
+      }
     }
   }
 
-  private void OnDestroy()
+  public override void OnStopClient()
   {
-    agent?.Dispose();
+    base.OnStopClient();
+    if (agent != null)
+    {
+      try
+      {
+        agent.LeaveChatroom();
+        agent.Dispose();
+        Debug.Log("Voice agent disposed for local player.");
+      }
+      catch (System.Exception e)
+      {
+        Debug.LogError($"Failed to dispose voice agent: {e.Message}");
+      }
+      agent = null;
+    }
   }
 }

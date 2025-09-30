@@ -1,22 +1,25 @@
+using UnityEngine;
 using FishNet.Object;
 using FishNet.Connection;
-using UnityEngine;
 using UnityEngine.UI;
 using UnityVolumeRendering;
 using System.Collections;
 using TMPro;
 using System.Linq;
+using System;
 
 public class VolumeDataControlUI : NetworkBehaviour
 {
   public VolumeDataNetworker volumeDataNetworker;
   public TMP_Dropdown positionAxisDropdown;
-  public Slider positionSlider;
+  public UnityEngine.UI.Button positionIncrementButton;
+  public Button positionDecrementButton;
   public TextMeshProUGUI positionXText;
   public TextMeshProUGUI positionYText;
   public TextMeshProUGUI positionZText;
   public TMP_Dropdown rotationAxisDropdown;
-  public Slider rotationSlider;
+  public Button rotationIncrementButton;
+  public Button rotationDecrementButton;
   public TextMeshProUGUI rotationXText;
   public TextMeshProUGUI rotationYText;
   public TextMeshProUGUI rotationZText;
@@ -24,7 +27,8 @@ public class VolumeDataControlUI : NetworkBehaviour
   public TextMeshProUGUI scaleText;
 
   private VolumeRenderedObject volumeObject;
-  private Vector3 lastRotationSliderValues; // Last slider value for x-, y-, z-axes
+  private const float positionIncrement = 0.1f; // Small increment for position
+  private const float rotationIncrement = 5f;   // Small increment for rotation
 
   private void Start()
   {
@@ -36,19 +40,28 @@ public class VolumeDataControlUI : NetworkBehaviour
     {
       Debug.LogError("VolumeDataNetworker not assigned in VolumeDataControlUI.");
     }
+    if (positionIncrementButton == null) // because for some reason the buttons do not want to assign
+      positionIncrementButton = GameObject.Find("position_pos_btn")?.GetComponent<Button>();
+    if (positionDecrementButton == null)
+      positionDecrementButton = GameObject.Find("position_neg_btn")?.GetComponent<Button>();
+    if (rotationIncrementButton == null)
+      rotationIncrementButton = GameObject.Find("rot_pos_btn")?.GetComponent<Button>();
+    if (rotationDecrementButton == null)
+      rotationDecrementButton = GameObject.Find("rot_neg_btn")?.GetComponent<Button>();
 
     // UI listeners
     if (positionAxisDropdown != null)
       positionAxisDropdown.onValueChanged.AddListener(OnPositionAxisChanged);
-    if (positionSlider != null)
-      positionSlider.onValueChanged.AddListener(OnPositionSliderChanged);
+    if (positionIncrementButton != null)
+      positionIncrementButton.onClick.AddListener(OnPositionIncrementClicked);
+    if (positionDecrementButton != null)
+      positionDecrementButton.onClick.AddListener(OnPositionDecrementClicked);
     if (rotationAxisDropdown != null)
       rotationAxisDropdown.onValueChanged.AddListener(OnRotationAxisChanged);
-    if (rotationSlider != null)
-    {
-      rotationSlider.onValueChanged.AddListener(OnRotationSliderChanged);
-      lastRotationSliderValues = new Vector3(rotationSlider.value, rotationSlider.value, rotationSlider.value); // Init all axes
-    }
+    if (rotationIncrementButton != null)
+      rotationIncrementButton.onClick.AddListener(OnRotationIncrementClicked);
+    if (rotationDecrementButton != null)
+      rotationDecrementButton.onClick.AddListener(OnRotationDecrementClicked);
     if (scaleSlider != null)
     {
       scaleSlider.onValueChanged.AddListener(OnScaleSliderChanged);
@@ -118,14 +131,18 @@ public class VolumeDataControlUI : NetworkBehaviour
       Debug.LogWarning("VolumeDataControlUI: volumeObject is null, setting UI to non-interactable.");
     }
 
-    if (positionAxisDropdown != null) 
+    if (positionAxisDropdown != null)
       positionAxisDropdown.interactable = isOwner;
-    if (positionSlider != null)
-      positionSlider.interactable = isOwner;
-    if (rotationAxisDropdown != null) 
+    if (positionIncrementButton != null)
+      positionIncrementButton.interactable = isOwner;
+    if (positionDecrementButton != null)
+      positionDecrementButton.interactable = isOwner;
+    if (rotationAxisDropdown != null)
       rotationAxisDropdown.interactable = isOwner;
-    if (rotationSlider != null) 
-      rotationSlider.interactable = isOwner;
+    if (rotationIncrementButton != null)
+      rotationIncrementButton.interactable = isOwner;
+    if (rotationDecrementButton != null)
+      rotationDecrementButton.interactable = isOwner;
     if (scaleSlider != null)
       scaleSlider.interactable = isOwner;
 
@@ -136,7 +153,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   {
     while (true)
     {
-      float scale = 1.0f; // Default scale when volumeObject is null
+      float scale = 1.0f; // Default scale
       Vector3 pos = Vector3.zero; // Default position
       Vector3 rot = Vector3.zero; // Default rotation
 
@@ -144,7 +161,7 @@ public class VolumeDataControlUI : NetworkBehaviour
       {
         pos = volumeObject.transform.position;
         rot = volumeObject.transform.rotation.eulerAngles;
-        scale = volumeObject.transform.localScale.x; // Update scale if volumeObject exists
+        scale = volumeObject.transform.localScale.x; // Uniform scaling
 
         rot.x = NormalizeAngle(rot.x);
         rot.y = NormalizeAngle(rot.y);
@@ -171,48 +188,12 @@ public class VolumeDataControlUI : NetworkBehaviour
       if (rotationZText != null)
         rotationZText.text = $"Z: {rot.z:F2}";
 
-      // Update scale text and slider
+      // Update scale text
       if (scaleText != null)
         scaleText.text = $"Scale: {scale:F2}";
       if (scaleSlider != null && !scaleSlider.IsInteractable())
       {
         scaleSlider.value = scale;
-      }
-
-      // Update position slider
-      if (positionSlider != null && positionAxisDropdown != null && !positionSlider.IsInteractable())
-      {
-        switch (positionAxisDropdown.value)
-        {
-          case 0: // x axis
-            positionSlider.value = pos.x;
-            break;
-          case 1: // y axis
-            positionSlider.value = pos.y;
-            break;
-          case 2: // z axis
-            positionSlider.value = pos.z;
-            break;
-        }
-      }
-      // Update rotation slider
-      if (rotationSlider != null && rotationAxisDropdown != null && !rotationSlider.IsInteractable())
-      {
-        switch (rotationAxisDropdown.value)
-        {
-          case 0: // x axis
-            rotationSlider.value = rot.x;
-            //lastRotationSliderValues.x = rot.x;
-            break;
-          case 1: // y axis
-            rotationSlider.value = rot.y;
-            //lastRotationSliderValues.y = rot.y;
-            break;
-          case 2: // z axis
-            rotationSlider.value = rot.z;
-            //lastRotationSliderValues.z = rot.z;
-            break;
-        }
       }
 
       yield return new WaitForSeconds(0.1f);
@@ -222,51 +203,157 @@ public class VolumeDataControlUI : NetworkBehaviour
   private void OnPositionAxisChanged(int index)
   {
     Debug.Log($"Position axis changed to: {positionAxisDropdown.options[index].text}");
-    // Update slider value to match current position for the selected axis
-    if (volumeObject != null && positionSlider != null && positionAxisDropdown != null)
-    {
-      Vector3 pos = volumeObject.transform.position;
-      switch (index)
-      {
-        case 0: // x axis
-          positionSlider.value = pos.x;
-          break;
-        case 1: // y axis
-          positionSlider.value = pos.y;
-          break;
-        case 2: // z axis
-          positionSlider.value = pos.z;
-          break;
-      }
-    }
   }
 
   private void OnRotationAxisChanged(int index)
   {
     Debug.Log($"Rotation axis changed to: {rotationAxisDropdown.options[index].text}");
-    // Update slider value to match current rotation for the selected axis
-    if (volumeObject != null && rotationSlider != null && rotationAxisDropdown != null)
+  }
+
+  private void OnPositionIncrementClicked()
+  {
+    if (!CanInteract())
     {
-      Vector3 rot = volumeObject.transform.rotation.eulerAngles;
-      rot.x = NormalizeAngle(rot.x);
-      rot.y = NormalizeAngle(rot.y);
-      rot.z = NormalizeAngle(rot.z);
-      switch (index)
-      {
-        case 0: // x axis
-          rotationSlider.value = rot.x;
-          lastRotationSliderValues.x = rot.x;
-          break;
-        case 1: // y axis
-          rotationSlider.value = rot.y;
-          lastRotationSliderValues.y = rot.y;
-          break;
-        case 2: // z axis
-          rotationSlider.value = rot.z;
-          lastRotationSliderValues.z = rot.z;
-          break;
-      }
+      Debug.LogWarning("Cannot adjust position: Not the owner or server.");
+      return;
     }
+
+    int axisIndex = positionAxisDropdown != null ? positionAxisDropdown.value : 0;
+    Vector3 newPos = volumeObject.transform.position;
+
+    switch (axisIndex)
+    {
+      case 0: // x axis
+        newPos.x += positionIncrement;
+        newPos.x = (float)Math.Round(newPos.x, 1);
+        break;
+      case 1: // y axis
+        newPos.y += positionIncrement;
+        newPos.y = (float)Math.Round(newPos.y, 1);
+        break;
+      case 2: // z axis
+        newPos.z += positionIncrement;
+        newPos.z = (float)Math.Round(newPos.z, 1);
+        break;
+    }
+
+    volumeObject.transform.position = newPos;
+    Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+
+    SetPositionServerRpc(newPos);
+  }
+
+  private void OnPositionDecrementClicked()
+  {
+    if (!CanInteract())
+    {
+      Debug.LogWarning("Cannot adjust position: Not the owner or server.");
+      return;
+    }
+
+    int axisIndex = positionAxisDropdown != null ? positionAxisDropdown.value : 0;
+    Vector3 newPos = volumeObject.transform.position;
+
+    switch (axisIndex)
+    {
+      case 0: // x axis
+        newPos.x -= positionIncrement;
+        newPos.x = (float)Math.Round(newPos.x, 1);
+        break;
+      case 1: // y axis
+        newPos.y -= positionIncrement;
+        newPos.y = (float)Math.Round(newPos.y, 1);
+        break;
+      case 2: // z axis
+        newPos.z -= positionIncrement;
+        newPos.z = (float)Math.Round(newPos.y, 1);
+        break;
+    }
+
+    volumeObject.transform.position = newPos;
+    Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+
+    SetPositionServerRpc(newPos);
+  }
+
+  private void OnRotationIncrementClicked()
+  {
+    if (!CanInteract())
+    {
+      Debug.LogWarning("Cannot adjust rotation: Not the owner or server.");
+      return;
+    }
+
+    int axisIndex = rotationAxisDropdown != null ? rotationAxisDropdown.value : 0;
+    Vector3 rotationAxis;
+
+    switch (axisIndex)
+    {
+      case 0: // x axis
+        rotationAxis = Vector3.right;
+        break;
+      case 1: // y axis
+        rotationAxis = Vector3.up;
+        break;
+      case 2: // z axis
+        rotationAxis = Vector3.forward;
+        break;
+      default:
+        rotationAxis = Vector3.up; // Fallback
+        break;
+    }
+
+    Quaternion deltaRotation = Quaternion.AngleAxis(rotationIncrement, rotationAxis);
+    Quaternion newRot = volumeObject.transform.rotation * deltaRotation;
+    volumeObject.transform.rotation = newRot;
+
+    Vector3 euler = newRot.eulerAngles;
+    euler.x = NormalizeAngle(euler.x);
+    euler.y = NormalizeAngle(euler.y);
+    euler.z = NormalizeAngle(euler.z);
+    Debug.Log($"Set rotation to Euler={euler}, Quaternion={newRot} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+
+    SetRotationServerRpc(newRot);
+  }
+
+  private void OnRotationDecrementClicked()
+  {
+    if (!CanInteract())
+    {
+      Debug.LogWarning("Cannot adjust rotation: Not the owner or server.");
+      return;
+    }
+
+    int axisIndex = rotationAxisDropdown != null ? rotationAxisDropdown.value : 0;
+    Vector3 rotationAxis;
+
+    switch (axisIndex)
+    {
+      case 0: // x axis
+        rotationAxis = Vector3.right;
+        break;
+      case 1: // y axis
+        rotationAxis = Vector3.up;
+        break;
+      case 2: // z axis
+        rotationAxis = Vector3.forward;
+        break;
+      default:
+        rotationAxis = Vector3.up; // Fallback
+        break;
+    }
+
+    Quaternion deltaRotation = Quaternion.AngleAxis(-rotationIncrement, rotationAxis);
+    Quaternion newRot = volumeObject.transform.rotation * deltaRotation;
+    volumeObject.transform.rotation = newRot;
+
+    Vector3 euler = newRot.eulerAngles;
+    euler.x = NormalizeAngle(euler.x);
+    euler.y = NormalizeAngle(euler.y);
+    euler.z = NormalizeAngle(euler.z);
+    Debug.Log($"Set rotation to Euler={euler}, Quaternion={newRot} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+
+    SetRotationServerRpc(newRot);
   }
 
   private void OnScaleSliderChanged(float value)
@@ -277,45 +364,11 @@ public class VolumeDataControlUI : NetworkBehaviour
       return;
     }
 
-    // Clamp scale to a reasonable range
-    // value = Mathf.Clamp(value, 0.1f, 10f);
     Vector3 newScale = new Vector3(value, value, value); // Uniform scaling
-
     volumeObject.transform.localScale = newScale;
     Debug.Log($"Set scale to {value} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
 
     SetScaleServerRpc(value);
-  }
-
-  private void OnPositionSliderChanged(float value)
-  {
-    if (!CanInteract())
-    {
-      Debug.LogWarning("Cannot adjust position: Not the owner or server.");
-      return;
-    }
-
-    int axisIndex = positionAxisDropdown != null ? positionAxisDropdown.value : 0;
-    Vector3 newPos = volumeObject.transform.position;
-    
-    // value = Mathf.Clamp(value, -10f, 10f);
-    switch (axisIndex)
-    {
-      case 0: // x axis
-        newPos.x = value; 
-        break;
-      case 1: // y axis
-        newPos.y = value; 
-        break;
-      case 2: // z axis
-        newPos.z = value;
-        break;
-    }
-
-    volumeObject.transform.position = newPos;
-    Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
-
-    SetPositionServerRpc(newPos);
   }
 
   [ServerRpc(RequireOwnership = false)]
@@ -348,55 +401,6 @@ public class VolumeDataControlUI : NetworkBehaviour
       volumeObject.transform.localScale = new Vector3(scale, scale, scale);
       Debug.Log($"Client {NetworkManager.ClientManager.Connection.ClientId} updated scale to {scale}.");
     }
-  }
-
-  private void OnRotationSliderChanged(float value)
-  {
-    if (!CanInteract())
-    {
-      Debug.LogWarning("Cannot adjust rotation: Not the owner or server.");
-      return;
-    }
-
-    int axisIndex = rotationAxisDropdown != null ? rotationAxisDropdown.value : 0;
-    Vector3 rotationAxis;
-    float lastValue;
-    switch (axisIndex)
-    {
-      case 0: // x axis
-        rotationAxis = Vector3.right;
-        lastValue = lastRotationSliderValues.x;
-        lastRotationSliderValues.x = value;
-        break;
-      case 1: // y axis
-        rotationAxis = Vector3.up;
-        lastValue = lastRotationSliderValues.y;
-        lastRotationSliderValues.y = value;
-        break;
-      case 2: // z axis
-        rotationAxis = Vector3.forward;
-        lastValue = lastRotationSliderValues.z;
-        lastRotationSliderValues.z = value;
-        break;
-      default:
-        rotationAxis = Vector3.up; // fallback to y axis
-        lastValue = lastRotationSliderValues.y;
-        lastRotationSliderValues.y = value;
-        break;
-    }
-
-    float deltaDegrees = value - lastValue;
-    Quaternion deltaRotation = Quaternion.AngleAxis(deltaDegrees, rotationAxis);
-    Quaternion newRot = volumeObject.transform.rotation * deltaRotation;
-
-    volumeObject.transform.rotation = newRot;
-    Vector3 euler = newRot.eulerAngles;
-    euler.x = NormalizeAngle(euler.x);
-    euler.y = NormalizeAngle(euler.y);
-    euler.z = NormalizeAngle(euler.z);
-    Debug.Log($"Set rotation to Euler={euler}, Quaternion={newRot} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
-
-    SetRotationServerRpc(newRot);
   }
 
   [ServerRpc(RequireOwnership = false)]
@@ -435,7 +439,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     volumeDataNetworker = networker;
   }
 
-  // Normalise angles to [0, 360) for UI display
+  // Normalize angles to [0, 360)
   private float NormalizeAngle(float angle)
   {
     angle = angle % 360f;
