@@ -99,7 +99,6 @@ GameObject:
   - component: {fileID: -5890594164196804893}
   - component: {fileID: -6913668075984788668}
   - component: {fileID: 6706588429914722639}
-  - component: {fileID: 349490891451555384}
   - component: {fileID: -6779870284383383194}
   - component: {fileID: 8820330590721950714}
   - component: {fileID: -8737401613996143091}
@@ -143,7 +142,7 @@ MonoBehaviour:
   _networkBehaviours:
   - {fileID: 7478292962984277194}
   - {fileID: 7670774828050007840}
-  - {fileID: 349490891451555384}
+  - {fileID: 0}
   - {fileID: 8820330590721950714}
   - {fileID: -8737401613996143091}
   <ParentNetworkObject>k__BackingField: {fileID: 0}
@@ -323,34 +322,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &349490891451555384
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 687899278494396546}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f572e46af83151541aed4c1c20a097ec, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _componentIndexCache: 2
-  _addedNetworkObject: {fileID: 4010609222888918593}
-  _networkObjectCache: {fileID: 4010609222888918593}
-  target: {fileID: 6706588429914722639}
-  targetIsKinematic: 1
-  clientAuthority: 1
-  syncVelocity: 1
-  clearVelocity: 0
-  syncAngularVelocity: 1
-  clearAngularVelocity: 0
-  _velocity: {x: 0, y: 0, z: 0}
-  _angularVelocity: {x: 0, y: 0, z: 0}
-  _isKinematic: 0
-  _useGravity: 0
-  _drag: 0
-  _angularDrag: 0
 --- !u!114 &-6779870284383383194
 MonoBehaviour:
   m_ObjectHideFlags: 0

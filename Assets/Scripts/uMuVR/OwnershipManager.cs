@@ -176,8 +176,7 @@ namespace uMuVR {
       Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
       if (!NetworkObject.IsOwner)
       {
-        NetworkObject.GiveOwnership(no.Owner);
-        Debug.Log($"OwnershipManager: Requested ownership transfer to client {no.Owner.ClientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+        RequestOwnershipServerRpc();
       }
       else
       {
@@ -213,8 +212,7 @@ namespace uMuVR {
       Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
       if (!NetworkObject.IsOwner)
       {
-        NetworkObject.GiveOwnership(no.Owner);
-        Debug.Log($"OwnershipManager: Requested ownership transfer to client {no.Owner.ClientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+        RequestOwnershipServerRpc();
       }
       else
       {
@@ -309,6 +307,16 @@ namespace uMuVR {
     //    }
     //  }
     //}
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestOwnershipServerRpc()
+    {
+      if (!NetworkObject.IsOwner)
+      {
+        NetworkObject.GiveOwnership(NetworkManager.ClientManager.Connection);
+        Debug.Log($"OwnershipManager: Server granted ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) to client {NetworkManager.ClientManager.Connection.ClientId}.");
+      }
+    }
     /////
 
 #if UNITY_EDITOR
@@ -322,12 +330,12 @@ namespace uMuVR {
         	var om = go.GetComponent<OwnershipManager>();
         	var nt = go.GetComponent<NetworkTransform>();
         	var rb = go.GetComponent<Rigidbody>();
-        	var nrb = go.GetComponent<NetworkRigidbody>();
+        	//var nrb = go.GetComponent<NetworkRigidbody>();
     
         	no ??= go.gameObject.AddComponent<NetworkObject>();
         	om ??= go.gameObject.AddComponent<OwnershipManager>();
         	nt ??= go.gameObject.AddComponent<NetworkTransform>();
-        	if (rb is not null) nrb ??= go.gameObject.AddComponent<NetworkRigidbody>();
+        	//if (rb is not null) nrb ??= go.gameObject.AddComponent<NetworkRigidbody>();
         }
 #endif
   }
