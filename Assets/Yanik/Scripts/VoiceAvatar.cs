@@ -9,14 +9,14 @@ public class VoiceAvatar : NetworkBehaviour
 {
   private Agent agent;
 
-  [Header("Positional Audio Settings")]
-  [SerializeField] private int maxDistance = 10;
-  [SerializeField] private int rolloffDistance = 5;
-  [SerializeField] private bool spatialize = true;
-  [SerializeField] private float minGain = 1f;
-  [SerializeField] private float maxGain = 1f;
-  [SerializeField] private float offset = 0f;
-  [SerializeField] private float rolloffFactor = 3f;
+  //[Header("Positional Audio Settings")]
+  //[SerializeField] private int maxDistance = 10;
+  //[SerializeField] private int rolloffDistance = 5;
+  //[SerializeField] private bool spatialize = true;
+  //[SerializeField] private float minGain = 1f;
+  //[SerializeField] private float maxGain = 1f;
+  //[SerializeField] private float offset = 0f;
+  //[SerializeField] private float rolloffFactor = 3f;
 
   private const string roomName = "<DEFAULT>";
 

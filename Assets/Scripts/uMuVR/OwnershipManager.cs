@@ -7,107 +7,117 @@ using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 // MY EDIT
 using System.Linq;
+using FishNet.Managing.Timing; // Added for TimeManager.Tick
 //
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
-namespace uMuVR {
-	
-	/// <summary>
-	/// Component that transfers ownership of this object to another user
-	/// </summary>
-	public class OwnershipManager : uMuVR.Enhanced.NetworkBehaviour {
-		[PropertyTooltip("Enable changing ownership when a user interacts with this object.")]
-		public bool enableInteractionTransfer = true;
-		[PropertyTooltip("Enable changing ownership when this object enters an ownership volume that belongs to a user.")]
-		public bool enableVolumeTransfer = true;
-		[PropertyTooltip("Should the owner of this object return it to the scene before leaving the game?")]
-		public bool releaseOwnershipOnLeave = true;
+namespace uMuVR
+{
 
+  /// <summary>
+  /// Component that transfers ownership of this object to another user
+  /// </summary>
+  public class OwnershipManager : uMuVR.Enhanced.NetworkBehaviour
+  {
+    [PropertyTooltip("Enable changing ownership when a user interacts with this object.")]
+    public bool enableInteractionTransfer = true;
+    [PropertyTooltip("Enable changing ownership when this object enters an ownership volume that belongs to a user.")]
+    public bool enableVolumeTransfer = true;
+    [PropertyTooltip("Should the owner of this object return it to the scene before leaving the game?")]
+    public bool releaseOwnershipOnLeave = true;
 
-		[PropertyTooltip("XR Interactable that is interacted with to trigger interactions")]
-		[ShowIf(nameof(enableInteractionTransfer)), PropertyOrder(1)]
-		public XRBaseInteractable XRIinteractable = null;
-		[ShowIf(nameof(enableInteractionTransfer)), PropertyOrder(2)]
-		public UxrGrabbableObject UXRinteractable = null;
-		[PropertyTooltip("Number of ticks to wait before an ownership transfer can occur again")]
-		public uint ownershipTransferCooldown = 10;
+    [PropertyTooltip("XR Interactable that is interacted with to trigger interactions")]
+    [ShowIf(nameof(enableInteractionTransfer)), PropertyOrder(1)]
+    public XRBaseInteractable XRIinteractable = null;
+    [ShowIf(nameof(enableInteractionTransfer)), PropertyOrder(2)]
+    public UxrGrabbableObject UXRinteractable = null;
+    [PropertyTooltip("Number of ticks to wait before an ownership transfer can occur again")]
+    public uint ownershipTransferCooldown = 10;
 
-    // MY EDITS
     [PropertyTooltip("Reference to VolumeDataNetworker to find the canvas")]
     [ShowIf(nameof(enableInteractionTransfer)), PropertyOrder(3)]
     public VolumeDataNetworker volumeDataNetworker = null;
-    //
+    private uint lastCanvasTransferTick = 0;
+    private uint lastOwnershipRequestTick = 0;
+    private const uint OWNERSHIP_RETRY_INTERVAL = 10; // Ticks
+    private const uint MAX_RETRIES = 3;
+    private uint ownershipRetryCount = 0;
 
     /// <summary>
     /// Counter tracking how many controllers are actively selecting us
     /// </summary>
     private uint selectionCount = 0;
-		/// <summary>
-		/// Property indicating if we are actively selected
-		/// </summary>
-		private bool isSelected => selectionCount > 0;
-		
-		/// <summary>
-		/// When this object is spawned on the client, add it as a listener to the interaction's interactions
-		/// </summary>
-		public override void OnStartClient() {
-			base.OnStartClient();
+    /// <summary>
+    /// Property indicating if we are actively selected
+    /// </summary>
+    private bool isSelected => selectionCount > 0;
 
-			// Only register us as a listener if interaction transfers are enabled
-			if (enableInteractionTransfer) {
-				if (XRIinteractable is not null) {
-					XRIinteractable.selectEntered.AddListener(OnXRIInteractableSelected);
-					XRIinteractable.selectExited.AddListener(OnXRIInteractableUnselected);
-				}
+    /// <summary>
+    /// When this object is spawned on the client, add it as a listener to the interaction's interactions
+    /// </summary>
+    public override void OnStartClient()
+    {
+      base.OnStartClient();
 
-				if (UXRinteractable is not null) {
-					UXRinteractable.Grabbing += OnUxrInteractableSelected;
-					UXRinteractable.Released += OnUxrInteractableUnselected;
-					UXRinteractable.Placed += OnUxrInteractableUnselected;
-				}
-			}
-			
-				
-		}
-		
-		/// <summary>
-		/// When this object is destroyed on the client, remove it it as an interaction listener
-		/// </summary>
-		public override void OnStopClient() {
-			base.OnStopClient();
+      if (enableInteractionTransfer)
+      {
+        if (XRIinteractable != null)
+        {
+          XRIinteractable.selectEntered.AddListener(OnXRIInteractableSelected);
+          XRIinteractable.selectExited.AddListener(OnXRIInteractableUnselected);
+        }
 
-			// Only unregister us as a listener if interaction transfers are enabled
-			if (XRIinteractable is not null) {
-				XRIinteractable.selectEntered.RemoveListener(OnXRIInteractableSelected);
-				XRIinteractable.selectExited.RemoveListener(OnXRIInteractableUnselected);
-			}
-			
-			if (UXRinteractable is not null) {
-				UXRinteractable.Grabbing -= OnUxrInteractableSelected;
-				UXRinteractable.Released -= OnUxrInteractableUnselected;
-				UXRinteractable.Placed -= OnUxrInteractableUnselected;
-			}
-		}
-		
-		/// <summary>
-		/// Un/Register the listener which returns control of the object to scene when its owner leaves
-		/// </summary>
-		public override void OnStartServer() {
-			base.OnStartServer();
-			ServerManager.Objects.OnPreDestroyClientObjects += OnPreDestroyClientObjects;
-		}
-		public override void OnStopServer() {
-			base.OnStopServer();
-			ServerManager.Objects.OnPreDestroyClientObjects -= OnPreDestroyClientObjects;
-		}
-		
-		/// <summary>
-		/// When the owner of this object leaves, return control of it to the scene
-		/// </summary>
-		public void OnPreDestroyClientObjects(NetworkConnection leaving) {
-      // MY EDIT
+        if (UXRinteractable != null)
+        {
+          UXRinteractable.Grabbing += OnUxrInteractableSelected;
+          UXRinteractable.Released += OnUxrInteractableUnselected;
+          UXRinteractable.Placed += OnUxrInteractableUnselected;
+        }
+      }
+    }
+
+    /// <summary>
+    /// When this object is destroyed on the client, remove it as an interaction listener
+    /// </summary>
+    public override void OnStopClient()
+    {
+      base.OnStopClient();
+
+      if (XRIinteractable != null)
+      {
+        XRIinteractable.selectEntered.RemoveListener(OnXRIInteractableSelected);
+        XRIinteractable.selectExited.RemoveListener(OnXRIInteractableUnselected);
+      }
+
+      if (UXRinteractable != null)
+      {
+        UXRinteractable.Grabbing -= OnUxrInteractableSelected;
+        UXRinteractable.Released -= OnUxrInteractableUnselected;
+        UXRinteractable.Placed -= OnUxrInteractableUnselected;
+      }
+    }
+
+    /// <summary>
+    /// Un/Register the listener which returns control of the object to scene when its owner leaves
+    /// </summary>
+    public override void OnStartServer()
+    {
+      base.OnStartServer();
+      ServerManager.Objects.OnPreDestroyClientObjects += OnPreDestroyClientObjects;
+    }
+    public override void OnStopServer()
+    {
+      base.OnStopServer();
+      ServerManager.Objects.OnPreDestroyClientObjects -= OnPreDestroyClientObjects;
+    }
+
+    /// <summary>
+    /// When the owner of this object leaves, return control of it to the scene
+    /// </summary>
+    public void OnPreDestroyClientObjects(NetworkConnection leaving)
+    {
       if (leaving != Owner) return;
 
       if (releaseOwnershipOnLeave)
@@ -134,49 +144,44 @@ namespace uMuVR {
           }
         }
       }
-      //if (leaving != Owner) return;
-
-      //if (releaseOwnershipOnLeave)
-      //	GiveOwnership(null);
     }
 
-		
-		/// <summary>
-		/// Automatically add the attached GrabInteractable
-		/// </summary>
-		protected override void OnValidate() {
-			base.OnValidate();
+    /// <summary>
+    /// Automatically add the attached GrabInteractable
+    /// </summary>
+    protected override void OnValidate()
+    {
+      base.OnValidate();
 
-			if (enableInteractionTransfer && XRIinteractable is null)
-				XRIinteractable = GetComponent<XRBaseInteractable>();
-			if (enableInteractionTransfer && UXRinteractable is null)
-				UXRinteractable = GetComponent<UxrGrabbableObject>();
-			// MY EDIT
+      if (enableInteractionTransfer && XRIinteractable == null)
+        XRIinteractable = GetComponent<XRBaseInteractable>();
+      if (enableInteractionTransfer && UXRinteractable == null)
+        UXRinteractable = GetComponent<UxrGrabbableObject>();
       if (enableInteractionTransfer && volumeDataNetworker == null)
         volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
     }
 
-		
-		/// <summary>
-		/// When this object is interacted with (only called if interaction transfers are enabled), give it to the interaction's owner
-		/// </summary>
-		/// <param name="e"></param>
-		protected void OnXRIInteractableSelected(SelectEnterEventArgs e) {
-			// NOTE: beware of NetworkObjects that may be in the way of the user representation that we are looking for
-			// there was a NetworkObject on the XRRig at some point which broke this whole function
-			var no = e.interactorObject.transform.GetComponentInParent<NetworkObject>();
-      if (no is null) return;
+    /// <summary>
+    /// When this object is interacted with (only called if interaction transfers are enabled), give it to the interaction's owner
+    /// </summary>
+    protected void OnXRIInteractableSelected(SelectEnterEventArgs e)
+    {
+      var no = e.interactorObject.transform.GetComponentInParent<NetworkObject>();
+      if (no == null) return;
 
-      //GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
-      //   // MY EDIT
-      //   Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, transferring ownership.");
-      //   TransferCanvasOwnership(no.Owner);
-      //   //
-      //   selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
+      if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + ownershipTransferCooldown)
+      {
+        Debug.Log($"OwnershipManager: Ownership request skipped due to cooldown for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+        return;
+      }
+
       Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
       if (!NetworkObject.IsOwner)
       {
-        RequestOwnershipServerRpc();
+        RequestOwnershipServerRpc(no.Owner.ClientId);
+        lastOwnershipRequestTick = NetworkManager.TimeManager.Tick;
+        ownershipRetryCount = 0;
+        InvokeRepeating(nameof(CheckOwnership), 0f, (float)(NetworkManager.TimeManager.TickDelta * OWNERSHIP_RETRY_INTERVAL));
       }
       else
       {
@@ -184,35 +189,27 @@ namespace uMuVR {
       }
       TransferCanvasOwnership(no.Owner);
       selectionCount++;
-      NetworkTransform nt = GetComponent<NetworkTransform>();
-      if (nt != null)
-      {
-        Debug.Log($"OwnershipManager: NetworkTransform sync state - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}, IsOwner: {NetworkObject.IsOwner}");
-      }
-      else
-      {
-        Debug.LogError($"OwnershipManager: NetworkTransform missing on {gameObject.name}!");
-      }
+      LogNetworkTransformState();
     }
 
-		protected void OnUxrInteractableSelected(object sender, UxrManipulationEventArgs args) {
-			// note: beware of NetworkObjects that may be in the way of the user representation that we are looking for
-			// there was a NetworkObject on the XRRig at some point which broke this whole function
-			var no = args.Grabber.transform.GetComponentInParent<NetworkObject>();
-			if (no is null) return;
+    protected void OnUxrInteractableSelected(object sender, UxrManipulationEventArgs args)
+    {
+      var no = args.Grabber.transform.GetComponentInParent<NetworkObject>();
+      if (no == null) return;
 
-      // MY EDIT
-      //Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, transferring ownership.");
-      //GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
-      //TransferCanvasOwnership(no.Owner);
-      //selectionCount++;
-      //selectionCount++; // Since we are now selected, volume transfers are temporarily disabled
-      //GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
-      //
+      if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + ownershipTransferCooldown)
+      {
+        Debug.Log($"OwnershipManager: Ownership request skipped due to cooldown for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
+        return;
+      }
+
       Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
       if (!NetworkObject.IsOwner)
       {
-        RequestOwnershipServerRpc();
+        RequestOwnershipServerRpc(no.Owner.ClientId);
+        lastOwnershipRequestTick = NetworkManager.TimeManager.Tick;
+        ownershipRetryCount = 0;
+        InvokeRepeating(nameof(CheckOwnership), 0f, (float)(NetworkManager.TimeManager.TickDelta * OWNERSHIP_RETRY_INTERVAL));
       }
       else
       {
@@ -220,52 +217,41 @@ namespace uMuVR {
       }
       TransferCanvasOwnership(no.Owner);
       selectionCount++;
-      NetworkTransform nt = GetComponent<NetworkTransform>();
-      if (nt != null)
-      {
-        Debug.Log($"OwnershipManager: NetworkTransform sync state - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}, IsOwner: {NetworkObject.IsOwner}");
-      }
-      else
-      {
-        Debug.LogError($"OwnershipManager: NetworkTransform missing on {gameObject.name}!");
-      }
+      LogNetworkTransformState();
     }
 
-		/// <summary>
-		/// When interaction with this object ceases, decrement the number of selections
-		/// </summary>
-		/// <param name="e"></param>
-		protected void OnXRIInteractableUnselected(SelectExitEventArgs e) {
-			selectionCount--; // If this was the last interaction, volume transfers are now enabled again!
-		}
+    /// <summary>
+    /// When interaction with this object ceases, decrement the number of selections
+    /// </summary>
+    protected void OnXRIInteractableUnselected(SelectExitEventArgs e)
+    {
+      selectionCount--;
+    }
 
-		protected void OnUxrInteractableUnselected(object sender, UxrManipulationEventArgs args) {
-			selectionCount--; // If this was the last interaction, volume transfers are now enabled again!
-		}
+    protected void OnUxrInteractableUnselected(object sender, UxrManipulationEventArgs args)
+    {
+      selectionCount--;
+    }
 
-		/// <summary>
-		/// When this object enters an Ownership Volume (only called if volume transfers are enabled), give it to the volume's owner
-		/// </summary>
-		/// <param name="other"></param>
-		protected void OnTriggerStay(Collider other) {
-			if (!enableVolumeTransfer) return;
+    /// <summary>
+    /// When this object enters an Ownership Volume (only called if volume transfers are enabled), give it to the volume's owner
+    /// </summary>
+    protected void OnTriggerStay(Collider other)
+    {
+      if (!enableVolumeTransfer) return;
 
-			var ov = other.GetComponent<OwnershipVolume>();
-			if (ov is null) return;
-			if (ov.volumeOwner == Owner) return; // No need to transfer if the volume has the same owner
+      var ov = other.GetComponent<OwnershipVolume>();
+      if (ov == null) return;
+      if (ov.volumeOwner == Owner) return;
 
-			// If we are currently selected don't transfer ownership
-			if (isSelected) return;
+      if (isSelected) return;
 
-			// Debug.Log($"{this} - {ov}");
+      if (ov.volumeOwner != null)
+        GiveOwnershipWithCooldown(ov.volumeOwner, ownershipTransferCooldown, true);
 
-			if (ov.volumeOwner is not null)
-				GiveOwnershipWithCooldown(ov.volumeOwner, ownershipTransferCooldown, true);
+      ov.RegisterAsListener(this);
+    }
 
-			// Be sure to listen for changes in ownership
-			ov.RegisterAsListener(this);
-		}
-    // MY EDIT
     private void TransferCanvasOwnership(NetworkConnection newOwner)
     {
       if (volumeDataNetworker == null)
@@ -274,68 +260,141 @@ namespace uMuVR {
         return;
       }
 
-      // Find the instantiated canvas by matching PrefabId
-      NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
+      if (NetworkManager.TimeManager.Tick < lastCanvasTransferTick + ownershipTransferCooldown)
+      {
+        Debug.Log($"OwnershipManager: Canvas ownership transfer skipped due to cooldown for client {newOwner?.ClientId ?? -1}.");
+        return;
+      }
+
       NetworkObject canvasNetworkObject = null;
       int expectedPrefabId = volumeDataNetworker.volumeControlCanvasPrefab?.GetComponent<NetworkObject>()?.PrefabId ?? -1;
       if (expectedPrefabId != -1)
       {
+        NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
         canvasNetworkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId && nob.GetComponent<VolumeDataControlUI>() != null);
       }
 
       if (canvasNetworkObject == null)
       {
-        Debug.LogWarning($"OwnershipManager: Failed to find instantiated canvas with PrefabId={expectedPrefabId}. Found {networkObjects.Length} NetworkObjects.");
+        GameObject canvasGO = GameObject.FindWithTag("VolumeControlCanvas");
+        if (canvasGO != null)
+        {
+          canvasNetworkObject = canvasGO.GetComponent<NetworkObject>();
+        }
+      }
+
+      if (canvasNetworkObject == null)
+      {
+        Debug.LogWarning($"OwnershipManager: Failed to find instantiated canvas with PrefabId={expectedPrefabId} or tag 'VolumeControlCanvas'.");
         return;
       }
 
       if (canvasNetworkObject.Owner != newOwner)
       {
-        canvasNetworkObject.GiveOwnership(newOwner);
-        Debug.Log($"OwnershipManager: Transferred canvas ownership to client {newOwner?.ClientId ?? -1}, ObjectId={canvasNetworkObject.ObjectId}, PrefabId={canvasNetworkObject.PrefabId}");
+        RequestCanvasOwnershipServerRpc(canvasNetworkObject.ObjectId, newOwner);
+        lastCanvasTransferTick = NetworkManager.TimeManager.Tick;
+        Debug.Log($"OwnershipManager: Initiating canvas ownership transfer to client {newOwner?.ClientId ?? -1}.");
       }
     }
-
-    //private void Update() // Update logs
-    //{
-    //  if (IsOwner)
-    //  {
-    //    NetworkTransform nt = GetComponent<NetworkTransform>();
-    //    if (nt != null)
-    //    {
-    //      Debug.Log($"OwnershipManager: Client {NetworkManager.ClientManager.Connection.ClientId} updating {gameObject.name} (ObjectId={NetworkObject.ObjectId}) - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}");
-    //    }
-    //  }
-    //}
 
     [ServerRpc(RequireOwnership = false)]
-    private void RequestOwnershipServerRpc()
+    private void RequestCanvasOwnershipServerRpc(int canvasObjectId, NetworkConnection newOwner)
     {
-      if (!NetworkObject.IsOwner)
+      NetworkObject canvasNetworkObject = null;
+      foreach (var nob in FindObjectsOfType<NetworkObject>())
       {
-        NetworkObject.GiveOwnership(NetworkManager.ClientManager.Connection);
-        Debug.Log($"OwnershipManager: Server granted ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) to client {NetworkManager.ClientManager.Connection.ClientId}.");
+        if (nob.ObjectId == canvasObjectId)
+        {
+          canvasNetworkObject = nob;
+          break;
+        }
+      }
+
+      if (canvasNetworkObject != null && canvasNetworkObject.Owner != newOwner)
+      {
+        canvasNetworkObject.GiveOwnership(newOwner);
+        Debug.Log($"OwnershipManager: Server granted canvas ownership of ObjectId={canvasObjectId} to client {newOwner?.ClientId ?? -1}.");
+      }
+      else
+      {
+        Debug.LogWarning($"OwnershipManager: Canvas ownership transfer failed for ObjectId={canvasObjectId}. Object {(canvasNetworkObject == null ? "not found" : "already owned by client " + newOwner?.ClientId)}.");
       }
     }
-    /////
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestOwnershipServerRpc(int clientId)
+    {
+      NetworkConnection requester = NetworkManager.ServerManager.Clients[clientId];
+      if (requester == null)
+      {
+        Debug.LogWarning($"OwnershipManager: Ownership request failed for {gameObject.name} (ObjectId={NetworkObject.ObjectId}). Client {clientId} not found.");
+        return;
+      }
+
+      Debug.Log($"RequestOwnershipServerRpc: Called by client {clientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId})");
+      if (!NetworkObject.IsOwner)
+      {
+        NetworkObject.GiveOwnership(requester);
+        Debug.Log($"OwnershipManager: Server granted ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) to client {clientId}.");
+      }
+      else
+      {
+        Debug.Log($"OwnershipManager: Ownership request ignored for {gameObject.name} (ObjectId={NetworkObject.ObjectId}). Already owned by client {NetworkObject.Owner.ClientId}.");
+      }
+    }
+
+    private void CheckOwnership()
+    {
+      if (NetworkObject.IsOwner)
+      {
+        Debug.Log($"OwnershipManager: Ownership confirmed for {gameObject.name} (ObjectId={NetworkObject.ObjectId}) by client {NetworkObject.Owner.ClientId}.");
+        CancelInvoke(nameof(CheckOwnership));
+        return;
+      }
+
+      if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + OWNERSHIP_RETRY_INTERVAL)
+        return;
+
+      if (ownershipRetryCount >= MAX_RETRIES)
+      {
+        Debug.LogError($"OwnershipManager: Failed to gain ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) after {MAX_RETRIES} retries. Check network issues (e.g., VoiceNetwork packet errors).");
+        CancelInvoke(nameof(CheckOwnership));
+        return;
+      }
+
+      Debug.Log($"OwnershipManager: Retrying ownership request for {gameObject.name} (ObjectId={NetworkObject.ObjectId}), attempt {ownershipRetryCount + 1}.");
+      RequestOwnershipServerRpc(NetworkManager.ClientManager.Connection.ClientId);
+      lastOwnershipRequestTick = NetworkManager.TimeManager.Tick;
+      ownershipRetryCount++;
+    }
+
+    private void LogNetworkTransformState()
+    {
+      NetworkTransform nt = GetComponent<NetworkTransform>();
+      if (nt != null)
+      {
+        Debug.Log($"OwnershipManager: NetworkTransform sync state - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}, IsOwner: {NetworkObject.IsOwner}");
+      }
+      else
+      {
+        Debug.LogError($"OwnershipManager: NetworkTransform missing on {gameObject.name}!");
+      }
+    }
 
 #if UNITY_EDITOR
-		// Function to add all of the necessary components for an object to be networked (visible in the UxrGrabbableObject and OwnershipManager) 
-		[MenuItem("CONTEXT/UxrGrabbableObject/Make Networked")]
-		[MenuItem("CONTEXT/OwnershipManager/Setup Object Networking")]
+        [MenuItem("CONTEXT/UxrGrabbableObject/Make Networked")]
+        [MenuItem("CONTEXT/OwnershipManager/Setup Object Networking")]
         public static void SetupObjectNetworking(MenuCommand command) {
-        	var go = (Component)command.context;
-    
-        	var no = go.GetComponent<NetworkObject>();
-        	var om = go.GetComponent<OwnershipManager>();
-        	var nt = go.GetComponent<NetworkTransform>();
-        	var rb = go.GetComponent<Rigidbody>();
-        	//var nrb = go.GetComponent<NetworkRigidbody>();
-    
-        	no ??= go.gameObject.AddComponent<NetworkObject>();
-        	om ??= go.gameObject.AddComponent<OwnershipManager>();
-        	nt ??= go.gameObject.AddComponent<NetworkTransform>();
-        	//if (rb is not null) nrb ??= go.gameObject.AddComponent<NetworkRigidbody>();
+            var go = (Component)command.context;
+        
+            var no = go.GetComponent<NetworkObject>();
+            var om = go.GetComponent<OwnershipManager>();
+            var nt = go.GetComponent<NetworkTransform>();
+            var rb = go.GetComponent<Rigidbody>();
+        
+            no ??= go.gameObject.AddComponent<NetworkObject>();
+            om ??= go.gameObject.AddComponent<OwnershipManager>();
+            nt ??= go.gameObject.AddComponent<NetworkTransform>();
         }
 #endif
   }
