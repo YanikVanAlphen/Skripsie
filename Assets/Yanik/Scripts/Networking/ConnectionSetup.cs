@@ -40,40 +40,59 @@ public class ConnectionSetup : MonoBehaviour
     Debug.Log($"Server state: {args.ConnectionState}");
     if (args.ConnectionState == LocalConnectionState.Started)
     {
-      // Create default voice chatroom when server starts
-      VoiceNetwork voiceNetwork = VoiceNetwork.instance;
-      if (voiceNetwork != null)
-      {
-        try
-        {
-          voiceNetwork.HostChatroom(VOICE_ROOM_NAME);
-          Debug.Log($"Created voice chatroom: {VOICE_ROOM_NAME}");
-        }
-        catch (Exception e)
-        {
-          Debug.LogError($"Failed to create voice chatroom: {e.Message}");
-        }
-      }
-      else
-      {
-        Debug.LogError("VoiceNetwork instance not found in scene!");
-      }
+      StartCoroutine(CreateVoiceRoomDelayed());
     }
   }
 
+  private IEnumerator CreateVoiceRoomDelayed()
+  {
+    // Wait for host's client connection to be established
+    while (InstanceFinder.ClientManager.Connection.ClientId == -1)
+    {
+      Debug.Log("Waiting for host client connection...");
+      yield return new WaitForSeconds(0.1f);
+    }
+
+    VoiceNetwork voiceNetwork = VoiceNetwork.instance;
+    if (voiceNetwork != null)
+    {
+      try
+      {
+        voiceNetwork.HostChatroom(VOICE_ROOM_NAME);
+        Debug.Log($"Created voice chatroom: {VOICE_ROOM_NAME}");
+      }
+      catch (Exception e)
+      {
+        Debug.LogError($"Failed to create voice chatroom: {e.Message}");
+      }
+    }
+    else
+    {
+      Debug.LogError("VoiceNetwork instance not found in scene!");
+    }
+  }
+
+  //private void ClientConnectionState(ClientConnectionStateArgs args)
+  //{
+  //  Debug.Log($"Client state: {args.ConnectionState}");
+  //  if (args.ConnectionState == LocalConnectionState.Started)
+  //  {
+  //    // Check if we're the host - already joined when creating the room
+  //    bool isHost = InstanceFinder.ServerManager.Started;
+
+  //    if (isHost)
+  //    {
+  //      return;
+  //    }
+
+  //    StartCoroutine(JoinVoiceRoomDelayed());
+  //  }
+  //}
   private void ClientConnectionState(ClientConnectionStateArgs args)
   {
     Debug.Log($"Client state: {args.ConnectionState}");
     if (args.ConnectionState == LocalConnectionState.Started)
     {
-      // Check if we're the host - already joined when creating the room
-      bool isHost = InstanceFinder.ServerManager.Started;
-
-      if (isHost)
-      {
-        return;
-      }
-
       StartCoroutine(JoinVoiceRoomDelayed());
     }
   }
