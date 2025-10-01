@@ -66,7 +66,14 @@ public class ConnectionSetup : MonoBehaviour
     Debug.Log($"Client state: {args.ConnectionState}");
     if (args.ConnectionState == LocalConnectionState.Started)
     {
-      // Delay joining to ensure server room is ready
+      // Check if we're the host - already joined when creating the room
+      bool isHost = InstanceFinder.ServerManager.Started;
+
+      if (isHost)
+      {
+        return;
+      }
+
       StartCoroutine(JoinVoiceRoomDelayed());
     }
   }
