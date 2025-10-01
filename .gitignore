@@ -121,3 +121,7 @@ Thumbs.db
 
 # Dataset files (if not using Git LFS)
 Assets/EasyVolumeRendering/DataFiles/
+
+# Exclude all except FishyVoice scripts
+/Assets/Thirdparty/FishyVoice/*
+!/Assets/Thirdparty/FishyVoice/*.cs
