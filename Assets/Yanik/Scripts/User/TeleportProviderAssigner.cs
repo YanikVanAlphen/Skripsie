@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
-
+/// <summary>
+/// Dynamically assigns Teleportation Provider component of XR Rig to the Teleportation Area of the scene floor plane upon
+/// spawn.
+/// </summary>
 public class TeleportProviderAssigner : MonoBehaviour
 {
   private void Start()
@@ -8,7 +11,6 @@ public class TeleportProviderAssigner : MonoBehaviour
     TeleportationProvider provider = GetComponentInChildren<TeleportationProvider>();
     if (provider == null)
     {
-      Debug.LogError("TeleportProviderAssigner: No TeleportationProvider found.");
       return;
     }
 
@@ -17,7 +19,5 @@ public class TeleportProviderAssigner : MonoBehaviour
     {
       area.teleportationProvider = provider;
     }
-
-    Debug.Log($"TeleportProviderAssigner: Assigned TeleportationProvider to {areas.Length} TeleportationArea(s).");
   }
 }

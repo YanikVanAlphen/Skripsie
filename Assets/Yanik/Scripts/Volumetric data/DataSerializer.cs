@@ -43,7 +43,7 @@ public static class DatasetSerializer
         using (GZipStream gzip = new GZipStream(compressedStream, CompressionMode.Compress, leaveOpen: true))
         {
           gzip.Write(uncompressedData, 0, uncompressedData.Length);
-          gzip.Flush(); // Ensure compression is complete
+          gzip.Flush(); // Ensure compression complete
         }
         byte[] result = compressedStream.ToArray();
         Debug.Log($"Serialized and compressed dataset: {result.Length / 1024f / 1024f:F2} MB");

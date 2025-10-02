@@ -2,6 +2,7 @@ using FishNet;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Managing;
+using FishNet.Managing;
 using FishNet.Transporting;
 using FishNet.Transporting.Tugboat;
 using FishyVoice;
@@ -14,84 +15,62 @@ using TMPro;
 
 public class ConnectionSetup : MonoBehaviour
 {
+  // private to other classes while still being editable in Unity Inspector
   [SerializeField] private NetworkManager networkManager;
-  [SerializeField] private GameObject userAvatarPrefab; // for explicit spawning
-  public Canvas mainMenuCanvas;
   [SerializeField] private GameObject ipInputFieldObject;
+  [SerializeField] private string hostIP = "10.255.10.54";
+  [SerializeField] private ushort portNumber = 7770;
 
-  private string IP = "10.255.10.54";
+  public Canvas mainMenuCanvas;
   private const string VOICE_ROOM_NAME = "<DEFAULT>";
+  private bool chatroomCreated = false;
 
+  /// <summary>
+  /// Executes before first frame of program to subscribe to FishNet connection states.
+  /// </summary>
   private void Start()
   {
-    if (networkManager == null)
-    {
-      Debug.LogError("NetworkManager is not assigned in ConnectionSetup!");
-      return;
-    }
-    // Debug connection states
-    InstanceFinder.ClientManager.OnClientConnectionState += ClientConnectionState;
-    InstanceFinder.ServerManager.OnServerConnectionState += ServerConnectionState;
-    InstanceFinder.ServerManager.OnRemoteConnectionState += (conn, args) => RemoteConnectionState(conn, args);
+    InstanceFinder.ClientManager.OnClientConnectionState += ClientConnectionState; // handle client connecting/disconnecting
+    InstanceFinder.ServerManager.OnServerConnectionState += ServerConnectionState; // handle server-side connection events
+    InstanceFinder.ServerManager.OnRemoteConnectionState += (conn, args) => RemoteConnectionState(conn, args); // handle remote client connection state
   }
 
   private void ServerConnectionState(ServerConnectionStateArgs args)
   {
-    Debug.Log($"Server state: {args.ConnectionState}");
-    if (args.ConnectionState == LocalConnectionState.Started)
+    Debug.Log($"Server state: {args.ConnectionState}.");
+    if (args.ConnectionState == LocalConnectionState.Started) // successful server start
     {
       StartCoroutine(CreateVoiceRoomDelayed());
     }
   }
 
+  /// <summary>
+  /// Coroutine to create voice comms chat room.
+  /// </summary>
+  /// <returns></returns>
   private IEnumerator CreateVoiceRoomDelayed()
   {
-    // Wait for host's client connection to be established
-    while (InstanceFinder.ClientManager.Connection.ClientId == -1)
-    {
-      Debug.Log("Waiting for host client connection...");
+    // wait until the host's client connection is established
+    while (InstanceFinder.ClientManager.Connection.ClientId == -1) // [-1] is invalid ID
       yield return new WaitForSeconds(0.1f);
-    }
 
     VoiceNetwork voiceNetwork = VoiceNetwork.instance;
-    if (voiceNetwork != null)
+    try
     {
-      try
-      {
-        voiceNetwork.HostChatroom(VOICE_ROOM_NAME);
-        Debug.Log($"Created voice chatroom: {VOICE_ROOM_NAME}");
-      }
-      catch (Exception e)
-      {
-        Debug.LogError($"Failed to create voice chatroom: {e.Message}");
-      }
+      voiceNetwork.HostChatroom(VOICE_ROOM_NAME);
+      chatroomCreated = true;
+      Debug.Log($"Created voice chatroom: {VOICE_ROOM_NAME}");
     }
-    else
+    catch (Exception e)
     {
-      Debug.LogError("VoiceNetwork instance not found in scene!");
+      Debug.LogError($"Failed to create voice chatroom with message: {e.Message}");
     }
   }
 
-  //private void ClientConnectionState(ClientConnectionStateArgs args)
-  //{
-  //  Debug.Log($"Client state: {args.ConnectionState}");
-  //  if (args.ConnectionState == LocalConnectionState.Started)
-  //  {
-  //    // Check if we're the host - already joined when creating the room
-  //    bool isHost = InstanceFinder.ServerManager.Started;
-
-  //    if (isHost)
-  //    {
-  //      return;
-  //    }
-
-  //    StartCoroutine(JoinVoiceRoomDelayed());
-  //  }
-  //}
   private void ClientConnectionState(ClientConnectionStateArgs args)
   {
     Debug.Log($"Client state: {args.ConnectionState}");
-    if (args.ConnectionState == LocalConnectionState.Started)
+    if (args.ConnectionState == LocalConnectionState.Started) // client connection started
     {
       StartCoroutine(JoinVoiceRoomDelayed());
     }
@@ -99,23 +78,18 @@ public class ConnectionSetup : MonoBehaviour
 
   private IEnumerator JoinVoiceRoomDelayed()
   {
-    yield return new WaitForSeconds(1f); // Wait for server
+    while (!InstanceFinder.ServerManager.Started && !chatroomCreated)
+      yield return new WaitForSeconds(0.1f); // Wait for server
+
     VoiceNetwork voiceNetwork = VoiceNetwork.instance;
-    if (voiceNetwork != null)
+    try
     {
-      try
-      {
-        voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
-        Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined voice chatroom: {VOICE_ROOM_NAME}");
-      }
-      catch (Exception e)
-      {
-        Debug.LogError($"Client failed to join voice chatroom: {e.Message}");
-      }
+      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
+      Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
     }
-    else
+    catch (Exception e)
     {
-      Debug.LogError("VoiceNetwork instance not found for client!");
+      Debug.LogError($"Client failed to join chatroom with message: {e.Message}");
     }
   }
 
@@ -145,8 +119,8 @@ public class ConnectionSetup : MonoBehaviour
     var tugboat = (Tugboat)networkManager.TransportManager.Transport;
     tugboat.SetClientAddress("127.0.0.1"); // Host's client connects to itself
     tugboat.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4);
-    tugboat.SetPort(7770);
-    Debug.Log($"Starting Host on {IP}:7770");
+    tugboat.SetPort(portNumber);
+    Debug.Log($"Starting Host on {hostIP}:{portNumber}");
     StartServer();
     StartClient();
   }
@@ -179,7 +153,6 @@ public class ConnectionSetup : MonoBehaviour
   {
     if (networkManager == null)
     {
-      Debug.LogError("NetworkManager is not assigned, cannot set IP address!");
       return;
     }
     var tugboat = (Tugboat)networkManager.TransportManager.Transport;
@@ -193,16 +166,16 @@ public class ConnectionSetup : MonoBehaviour
       }
       else
       {
-        tugboat.SetClientAddress(IP);
-        Debug.LogWarning($"Input field is empty, using default: {IP}");
+        tugboat.SetClientAddress(hostIP);
+        Debug.LogWarning($"Input field is empty, using default: {hostIP}");
       }
     }
     else
     {
-      tugboat.SetClientAddress(IP);
-      Debug.LogWarning($"ipInputFieldObject is null, using default: {IP}");
+      tugboat.SetClientAddress(hostIP);
+      Debug.LogWarning($"ipInputFieldObject is null, using default: {hostIP}");
     }
-    tugboat.SetPort(7770);
+    tugboat.SetPort(portNumber);
   }
 
   private void HideMenu()
@@ -210,10 +183,14 @@ public class ConnectionSetup : MonoBehaviour
     if (mainMenuCanvas != null)
     {
       //mainMenuCanvas.gameObject.SetActive(false);
-      mainMenuCanvas.enabled = false; // only disable visual
+      mainMenuCanvas.enabled = false; // only disable visual instead of whole menu canvas
     }
   }
 
+  /// <summary>
+  /// Obtained from Unity Forums https://discussions.unity.com/t/get-the-device-ip-address-from-unity/235351/2. Only returns first IP from the list.
+  /// </summary>
+  /// <returns></returns>
   private string GetLocalIPv4()
   {
     try
@@ -228,25 +205,4 @@ public class ConnectionSetup : MonoBehaviour
       return "127.0.0.1";
     }
   }
-
-  /*
-  private void SpawnPlayerForClient(NetworkConnection conn)
-  {
-      if (userAvatarPrefab == null)
-      {
-          Debug.LogError("UserAvatar prefab is not assigned in ConnectionSetup!");
-          return;
-      }
-      GameObject player = Instantiate(userAvatarPrefab, Vector3.zero, Quaternion.identity);
-      NetworkObject nob = player.GetComponent<NetworkObject>();
-      if (nob == null)
-      {
-          Debug.LogError("UserAvatar prefab missing NetworkObject!");
-          Destroy(player);
-          return;
-      }
-      networkManager.ServerManager.Spawn(player, conn);
-      Debug.Log($"Spawned UserAvatar for client {conn.ClientId}, ObjectId={nob.ObjectId}, Owner={nob.Owner.ClientId}");
-  }
-  */
 }

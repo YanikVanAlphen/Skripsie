@@ -4,73 +4,65 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using uMuVR;
 
+/// <summary>
+/// Adapted from tutorial on hand animations from Valem Tutorials (https://www.youtube.com/watch?v=8PCNNro7Rt0&list=PLpEoiloH-4eP-OKItF8XNJ8y8e1asOJud&index=3) with extension to networked hand animations.
+/// </summary>
 public class AnimateHandOnInput : NetworkBehaviour
 {
   public InputActionProperty pinchAnimationAction;
   public InputActionProperty gripAnimationAction;
   public Animator handAnimator;
 
-  [SyncVar(OnChange = nameof(OnTriggerChanged))]
+  [SyncVar(OnChange = nameof(OnTriggerChanged))] // register callback
   private float triggerValue;
-  [SyncVar(OnChange = nameof(OnGripChanged))]
+
+  [SyncVar(OnChange = nameof(OnGripChanged))] // register callback
   private float gripValue;
 
   private void OnTriggerChanged(float oldValue, float newValue, bool asServer)
   {
-    if (handAnimator != null)
-    {
-      handAnimator.SetFloat("Trigger", newValue);
-    }
+    handAnimator.SetFloat("Trigger", newValue);
   }
 
   private void OnGripChanged(float oldValue, float newValue, bool asServer)
   {
-    if (handAnimator != null)
-    {
-      handAnimator.SetFloat("Grip", newValue);
-    }
+    handAnimator.SetFloat("Grip", newValue);
   }
 
   private void Start()
   {
-    if (handAnimator == null)
-    {
-      handAnimator = GetComponent<Animator>();
-      if (handAnimator == null)
-      {
-        Debug.LogError($"No Animator found on {gameObject.name}");
-      }
-    }
+    handAnimator = GetComponent<Animator>();
   }
 
   private void Update()
   {
-    if (IsOwner && handAnimator != null)
+    if (IsOwner)
     {
-      float newTriggerValue = pinchAnimationAction.action?.ReadValue<float>() ?? 0f;
-      float newGripValue = gripAnimationAction.action?.ReadValue<float>() ?? 0f;
+      float newTriggerValue = pinchAnimationAction.action.ReadValue<float>();
+      float newGripValue = gripAnimationAction.action.ReadValue<float>();
 
       if (newTriggerValue != triggerValue)
       {
         triggerValue = newTriggerValue;
-        CmdUpdateTrigger(newTriggerValue);
+        UpdateTrigger(newTriggerValue);
       }
       if (newGripValue != gripValue)
       {
         gripValue = newGripValue;
-        CmdUpdateGrip(newGripValue);
+        UpdateGrip(newGripValue);
       }
     }
   }
 
+  // update owner's trigger+grip syncvars across the server
   [ServerRpc(RequireOwnership = true)]
-  private void CmdUpdateTrigger(float value)
+  private void UpdateTrigger(float value)
   {
     triggerValue = value;
   }
 
   [ServerRpc(RequireOwnership = true)]
-  private void CmdUpdateGrip(float value)
+  private void UpdateGrip(float value)
   {
     gripValue = value;
   }
