@@ -2,7 +2,6 @@ using FishNet;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Managing;
-using FishNet.Managing;
 using FishNet.Transporting;
 using FishNet.Transporting.Tugboat;
 using FishyVoice;
@@ -84,7 +83,7 @@ public class ConnectionSetup : MonoBehaviour
     VoiceNetwork voiceNetwork = VoiceNetwork.instance;
     try
     {
-      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
+      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME); // TODO resolve error in joining with ownID
       Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
     }
     catch (Exception e)
@@ -95,10 +94,10 @@ public class ConnectionSetup : MonoBehaviour
 
   private void RemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
   {
-    Debug.Log($"Client {conn.ClientId} state: {args.ConnectionState}");
+    Debug.Log($"Remote client {conn.ClientId} state: {args.ConnectionState}");
   }
 
-  private void OnDestroy()
+  private void OnDestroy() // unsubscribe for cleanup
   {
     if (InstanceFinder.ClientManager != null)
       InstanceFinder.ClientManager.OnClientConnectionState -= ClientConnectionState;
@@ -111,14 +110,9 @@ public class ConnectionSetup : MonoBehaviour
 
   public void StartHost()
   {
-    if (networkManager == null)
-    {
-      Debug.LogError("NetworkManager is not assigned, cannot start host!");
-      return;
-    }
     var tugboat = (Tugboat)networkManager.TransportManager.Transport;
-    tugboat.SetClientAddress("127.0.0.1"); // Host's client connects to itself
-    tugboat.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4);
+    tugboat.SetClientAddress("127.0.0.1"); // Host client connects to itself
+    tugboat.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4); // config server to accept connections from any IP
     tugboat.SetPort(portNumber);
     Debug.Log($"Starting Host on {hostIP}:{portNumber}");
     StartServer();
@@ -127,11 +121,6 @@ public class ConnectionSetup : MonoBehaviour
 
   public void StartServer()
   {
-    if (networkManager == null)
-    {
-      Debug.LogError("NetworkManager is not assigned, cannot start server!");
-      return;
-    }
     networkManager.ServerManager.StartConnection();
     Debug.Log("Server started");
     HideMenu();
@@ -139,11 +128,6 @@ public class ConnectionSetup : MonoBehaviour
 
   public void StartClient()
   {
-    if (networkManager == null)
-    {
-      Debug.LogError("NetworkManager is not assigned, cannot start client!");
-      return;
-    }
     networkManager.ClientManager.StartConnection();
     Debug.Log("Client connection started");
     HideMenu();
@@ -162,18 +146,17 @@ public class ConnectionSetup : MonoBehaviour
       if (inputField != null && !string.IsNullOrEmpty(inputField.text))
       {
         tugboat.SetClientAddress(inputField.text);
-        Debug.Log($"User Input: Changed Host IP to connect to: {inputField.text}");
       }
       else
       {
         tugboat.SetClientAddress(hostIP);
-        Debug.LogWarning($"Input field is empty, using default: {hostIP}");
+        Debug.LogWarning($"IP input field is empty, using default host IP: {hostIP}");
       }
     }
     else
     {
       tugboat.SetClientAddress(hostIP);
-      Debug.LogWarning($"ipInputFieldObject is null, using default: {hostIP}");
+      Debug.LogWarning($"ipInputFieldObject is null, using default host IP: {hostIP}");
     }
     tugboat.SetPort(portNumber);
   }

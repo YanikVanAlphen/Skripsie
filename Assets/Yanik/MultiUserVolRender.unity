@@ -1023,9 +1023,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   networkManager: {fileID: 1696469385}
-  userAvatarPrefab: {fileID: 0}
-  mainMenuCanvas: {fileID: 1070816313}
   ipInputFieldObject: {fileID: 1046704468}
+  hostIP: 10.255.10.54
+  portNumber: 7770
+  mainMenuCanvas: {fileID: 1070816313}
 --- !u!1 &1154433762
 GameObject:
   m_ObjectHideFlags: 0

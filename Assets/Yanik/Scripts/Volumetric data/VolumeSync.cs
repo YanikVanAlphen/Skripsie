@@ -1,17 +1,20 @@
 using FishNet.Object;
 using UnityEngine;
-using UnityVolumeRendering;
-
+using UnityVolumeRendering; // Volume rendering plugin from mlavik
+using System.Collections;
+/// <summary>
+/// Manages any networked changes to the rendering of volumetric data
+/// </summary>
 public class VolumeSync : NetworkBehaviour
 {
   private VolumeRenderedObject volumeObject;
 
   private void Awake()
   {
-    StartCoroutine(InitializeVolumeObject());
+    StartCoroutine(InitVolumeObject());
   }
 
-  private System.Collections.IEnumerator InitializeVolumeObject()
+  private IEnumerator InitVolumeObject()
   {
     int retryCount = 0;
     const int maxRetries = 40; // Wait up to 20 seconds
@@ -20,7 +23,6 @@ public class VolumeSync : NetworkBehaviour
       volumeObject = FindObjectOfType<VolumeRenderedObject>();
       if (volumeObject == null)
       {
-        Debug.Log("Waiting for VolumeRenderedObject component...");
         retryCount++;
         yield return new WaitForSeconds(0.5f);
       }
@@ -28,15 +30,25 @@ public class VolumeSync : NetworkBehaviour
 
     if (volumeObject == null)
     {
-      Debug.LogError("Failed to find VolumeRenderedObject after max retries.");
+      Debug.LogError("Failed to find VolumeRenderedObject.");
       yield break;
     }
 
-    Debug.Log("VolumeSync initialized with VolumeRenderedObject.");
+    Debug.Log("VolumeSync found VolumeRenderedObject.");
     ApplyRenderSettings();
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  private void ApplyRenderSettings()
+  {
+    if (volumeObject != null)
+    {
+      volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
+      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
+      Debug.Log("Applied initial render settings to volumetric dataset.");
+    }
+  }
+
+  [ServerRpc(RequireOwnership = false)] // all clients allowed to call this function
   public void UpdateRenderMode(UnityVolumeRendering.RenderMode mode)
   {
     if (volumeObject != null)
@@ -47,7 +59,7 @@ public class VolumeSync : NetworkBehaviour
     }
   }
 
-  [ObserversRpc]
+  [ObserversRpc] // propagate the updated change to all other clients
   private void RpcUpdateRenderMode(UnityVolumeRendering.RenderMode mode)
   {
     if (volumeObject != null)
@@ -75,16 +87,6 @@ public class VolumeSync : NetworkBehaviour
     {
       volumeObject.SetVisibilityWindow(range);
       Debug.Log($"Client updated visibility window to {range}");
-    }
-  }
-
-  private void ApplyRenderSettings()
-  {
-    if (volumeObject != null)
-    {
-      volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
-      volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
-      Debug.Log("Applied initial render settings.");
     }
   }
 }
