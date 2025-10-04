@@ -31,6 +31,11 @@ namespace VolumeData
       //this.dataType = dataType; // let user decide the input?
     }
 
+    public DataSetLoader() // overloaded constructor for client-side init
+    {
+      this.datasetPath = string.Empty;
+    }
+
     public string GetDataPath()
     {
       string fullPath;

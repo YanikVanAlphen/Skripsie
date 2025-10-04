@@ -164,7 +164,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     //  yield break;
     //}
 
-    datasetLoader = new DataSetLoader(datasetPath);
+    datasetLoader = new DataSetLoader(datasetPath); // create new datasetloader
     VolumeDataset dataset = datasetLoader.LoadDataset();
     if (dataset == null)
     {
@@ -419,6 +419,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
     //  Debug.Log($"Client assigned dataset to ObjectId={networkObject.ObjectId}");
     //}
+    datasetLoader = new DataSetLoader(); // create new datasetloader
     yield return datasetLoader.ConfigureVolumeRenderingAsync(volumeObject, dataset);
 
     volumeObject.transform.position = position ?? defaultPosition;
