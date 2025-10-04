@@ -1,19 +1,9 @@
-using FishNet.Object;
-using FishNet.Connection;
-using FishNet.Component.Transforming;
-using FishNet.Managing.Server;
-using FishNet.Managing.Object;
-using FishNet.Managing;
-using FishNet.Transporting;
-using FishNet.Transporting.Tugboat;
 using UnityEngine;
 using UnityVolumeRendering;
 using System.Linq;
 using System.IO;
 using System;
 using System.Collections;
-using System.Collections.Generic;
-//using System.Threading.Tasks;
 
 namespace VolumeData
 {
@@ -107,16 +97,16 @@ namespace VolumeData
             return null;
           }
         }
-        else if (File.Exists(fullPath))
+        else if (File.Exists(fullPath)) // file based datasets
         {
-          if (datasetType == DatasetType.Raw)
+          if (datasetType == DatasetType.Raw) // plugin's ImporterFactory does not consider .raw files so create RAW importer manually
           {
-            string iniPath = Path.ChangeExtension(fullPath, ".ini");
+            string iniPath = Path.ChangeExtension(fullPath, ".ini"); // find .ini file if it exists
             DatasetIniData ini = DatasetIniReader.ParseIniFile(iniPath);
             if (ini == null)
             {
               Debug.LogWarning("No .ini found for RAW dataset, using defaults.");
-              ini = new DatasetIniData(); // make sure the defaults are set
+              ini = new DatasetIniData(); // make sure the defaults are set - per default values that plugin gives
               ini.dimX = 128;
               ini.dimY = 256;
               ini.dimZ = 256;
@@ -138,7 +128,7 @@ namespace VolumeData
               importer = ImporterFactory.CreateImageFileImporter(ImageFileFormat.VASP);
 
             if (importer != null)
-              dataset = importer.Import(fullPath);
+              dataset = importer.Import(fullPath); // plugin method to import data
           }
         }
         else
@@ -168,32 +158,33 @@ namespace VolumeData
         yield break;
       }
 
-      /* RENDERING OPTIONS:
+      /* RENDERING OPTIONS (from plugin):
       * RenderMode.DirectVolumeRendering
-      * RenderMode.MaximumIntensityProjectipon (plugin author's typo)
+      * RenderMode.MaximumIntensityProjectipon (plugin author's typo, keep as is)
       * RenderMode.IsosurfaceRendering
       */
       volumeObject.dataset = dataset;
       float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-      volumeObject.transform.localScale = Vector3.one / maxScale;
+      volumeObject.transform.localScale = Vector3.one / maxScale; // normalise the scaling + uniform scaling in all axes
 
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer"); // access VolumeContainer child of VolumeRenderedObject to explicitly set rendering params
       MeshRenderer meshRenderer = null;
       if (volumeContainer == null)
       {
         Debug.LogWarning("VolumeContainer child not found");
-        GameObject container = new GameObject("VolumeContainer");
-        container.transform.SetParent(volumeObject.transform, false);
-        container.transform.localPosition = Vector3.zero;
-        container.transform.localRotation = Quaternion.identity;
-        container.transform.localScale = Vector3.one;
+        // is this necessary to check?
+        //GameObject container = new GameObject("VolumeContainer");
+        //container.transform.SetParent(volumeObject.transform, false);
+        //container.transform.localPosition = Vector3.zero;
+        //container.transform.localRotation = Quaternion.identity;
+        //container.transform.localScale = Vector3.one;
 
-        MeshFilter meshFilter = container.AddComponent<MeshFilter>();
-        meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().sharedMesh;
-        GameObject.Destroy(GameObject.Find("Cube")); // Clean up temp cube
+        //MeshFilter meshFilter = container.AddComponent<MeshFilter>();
+        //meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().sharedMesh;
+        //GameObject.Destroy(GameObject.Find("Cube")); // Clean up temp cube
 
-        meshRenderer = container.AddComponent<MeshRenderer>();
-        volumeContainer = container.transform;
+        //meshRenderer = container.AddComponent<MeshRenderer>();
+        //volumeContainer = container.transform;
       }
       else
       {

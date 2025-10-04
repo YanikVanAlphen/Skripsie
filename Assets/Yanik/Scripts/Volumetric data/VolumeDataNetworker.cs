@@ -27,7 +27,6 @@ public class VolumeDataNetworker : NetworkBehaviour
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
   [SerializeField] public GameObject volumeRenderedObjectPrefab; // Public for VolumeDataControlUI
   [SerializeField] public GameObject volumeControlCanvasPrefab; // Public for OwnershipManager
-  //[SerializeField] private DatasetType dataTypeToSpawn;
 
   private VolumeRenderedObject volumeObject;
   private GameObject canvasObject;
@@ -158,12 +157,6 @@ public class VolumeDataNetworker : NetworkBehaviour
 
     RegisterPrefab();
 
-    //if (volumeRenderedObjectPrefab == null)
-    //{
-    //  Debug.LogError("VolumeRenderedObjectPrefab is not assigned in VolumeDataNetworker.");
-    //  yield break;
-    //}
-
     datasetLoader = new DataSetLoader(datasetPath); // create new datasetloader
     VolumeDataset dataset = datasetLoader.LoadDataset();
     if (dataset == null)
@@ -250,10 +243,14 @@ public class VolumeDataNetworker : NetworkBehaviour
     chunkStorage[NetworkManager.ClientManager.Connection][chunkIndex] = chunk;
     Debug.Log($"Client received chunk {chunkIndex + 1}/{totalChunks}, size={chunk.Length} bytes");
 
-    if (chunkStorage[NetworkManager.ClientManager.Connection].All(c => c != null))
+    // get all chunks for the current client
+    byte[][] clientChunks = chunkStorage[NetworkManager.ClientManager.Connection];
+    // check if all chunks have been received
+    bool allChunksReceived = clientChunks.All(chunk => chunk != null);
+    if (allChunksReceived)
     {
-      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[NetworkManager.ClientManager.Connection]);
-      VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData);
+      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[NetworkManager.ClientManager.Connection]); // uncompress data
+      VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData); // deserialize back into original form before transmission
       chunkStorage.Remove(NetworkManager.ClientManager.Connection);
 
       if (dataset == null)
@@ -335,94 +332,10 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
     }
 
-    //if (dataset != null && volumeObject.dataset == null)
-    //{
-    //  volumeObject.dataset = dataset;
-    //  float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-    //  volumeObject.transform.localScale = Vector3.one / maxScale;
-
-    //  Transform volumeContainer = volumeObject.transform.Find("VolumeContainer");
-    //  MeshRenderer meshRenderer = null;
-    //  if (volumeContainer != null)
-    //  {
-    //    meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
-    //    if (meshRenderer != null && meshRenderer.sharedMaterial != null)
-    //    {
-    //      Shader volumeShader = Shader.Find(DVRShaderName);
-    //      if (volumeShader != null && meshRenderer.sharedMaterial.shader != volumeShader)
-    //      {
-    //        Debug.LogWarning($"Client: VolumeContainer material shader is {meshRenderer.sharedMaterial.shader.name}, expected {DVRShaderName}. Updating material.");
-    //        meshRenderer.sharedMaterial = new Material(volumeShader);
-    //      }
-    //      Debug.Log($"Client: VolumeContainer found with material {meshRenderer.sharedMaterial.shader.name}");
-    //    }
-    //    else
-    //    {
-    //      Debug.LogError($"Client: VolumeContainer missing MeshRenderer or material.");
-    //      yield break;
-    //    }
-    //  }
-    //  else
-    //  {
-    //    Debug.LogError($"Client: VolumeContainer child not found.");
-    //    yield break;
-    //  }
-
-    //  if (meshRenderer != null && meshRenderer.sharedMaterial != null)
-    //  {
-    //    Texture3D dataTexture = dataset.GetDataTexture();
-    //    if (dataTexture != null)
-    //    {
-    //      meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
-    //      Debug.Log($"Client: Assigned dataset texture.");
-    //    }
-    //    else
-    //    {
-    //      Debug.LogWarning("Client: Failed to get dataset texture.");
-    //    }
-
-    //    UnityVolumeRendering.TransferFunction tf = TransferFunctionDatabase.CreateTransferFunction();
-    //    volumeObject.transferFunction = tf;
-    //    Texture2D tfTexture = tf.GetTexture();
-    //    if (tfTexture != null)
-    //    {
-    //      meshRenderer.sharedMaterial.SetTexture("_TFTex", tfTexture);
-    //      Debug.Log($"Client: Assigned transfer function texture.");
-    //    }
-    //    else
-    //    {
-    //      Debug.LogWarning("Client: Failed to get transfer function texture.");
-    //    }
-
-    //    const int noiseDimX = 512;
-    //    const int noiseDimY = 512;
-    //    Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
-    //    if (noiseTexture != null)
-    //    {
-    //      meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture);
-    //      Debug.Log($"Client: Assigned noise texture.");
-    //    }
-    //    else
-    //    {
-    //      Debug.LogWarning("Client: Failed to generate noise texture.");
-    //    }
-
-    //    meshRenderer.sharedMaterial.EnableKeyword("MODE_DVR");
-    //    meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
-    //    meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
-    //    volumeObject.meshRenderer = meshRenderer;
-    //  }
-
-    //  volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
-    //  volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
-    //  volumeObject.UpdateMaterialProperties();
-
-    //  Debug.Log($"Client assigned dataset to ObjectId={networkObject.ObjectId}");
-    //}
     datasetLoader = new DataSetLoader(); // create new datasetloader
     yield return datasetLoader.ConfigureVolumeRenderingAsync(volumeObject, dataset);
-
-    volumeObject.transform.position = position ?? defaultPosition;
+    // set to default positions if rotation or position is null
+    volumeObject.transform.position = position ?? defaultPosition; 
     volumeObject.transform.rotation = rotation ?? defaultRotation;
   }
 

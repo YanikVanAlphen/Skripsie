@@ -109,7 +109,7 @@ public static class DatasetSerializer
         int dataLength = reader.ReadInt32();
         dataset.data = new float[dataLength];
         Debug.Log($"Deserializing dataset: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}, dataLength={dataLength}");
-        for (int i = 0; i < dataLength; i++) // rest of info
+        for (int i = 0; i < dataLength; i++) // rest of data
           dataset.data[i] = reader.ReadSingle();
         Debug.Log($"Deserialized dataset successfully: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}");
         return dataset;
