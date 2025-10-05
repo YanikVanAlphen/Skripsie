@@ -4372,6 +4372,7 @@ GameObject:
   - component: {fileID: 4344840452321603846}
   - component: {fileID: 664930613836434806}
   - component: {fileID: 2134901569356180814}
+  - component: {fileID: 2523150741379064304}
   m_Layer: 5
   m_Name: MenuDataControl
   m_TagString: Untagged
@@ -4412,6 +4413,7 @@ MonoBehaviour:
   _networkBehaviours:
   - {fileID: 664930613836434806}
   - {fileID: 2134901569356180814}
+  - {fileID: 2523150741379064304}
   <ParentNetworkObject>k__BackingField: {fileID: 0}
   <ChildNetworkObjects>k__BackingField: []
   _isNetworked: 1
@@ -4447,6 +4449,7 @@ MonoBehaviour:
   XRIinteractable: {fileID: 0}
   UXRinteractable: {fileID: 0}
   ownershipTransferCooldown: 10
+  volumeDataNetworker: {fileID: 0}
 --- !u!114 &2134901569356180814
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4464,19 +4467,39 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 4344840452321603846}
   volumeDataNetworker: {fileID: 0}
   positionAxisDropdown: {fileID: 358805791527570686}
-  positionIncrementButton: {fileID: 0}
-  positionDecrementButton: {fileID: 0}
+  positionIncrementButton: {fileID: 1871210512310693417}
+  positionDecrementButton: {fileID: 7785442960708335147}
   positionXText: {fileID: 710174569157782230}
   positionYText: {fileID: 4030977764748941816}
   positionZText: {fileID: 9001255581028731224}
   rotationAxisDropdown: {fileID: 8283274597092300092}
-  rotationIncrementButton: {fileID: 0}
-  rotationDecrementButton: {fileID: 0}
+  rotationIncrementButton: {fileID: 8490150625586822419}
+  rotationDecrementButton: {fileID: 5730360378794433709}
   rotationXText: {fileID: 2570391924876306662}
   rotationYText: {fileID: 6410648606887496783}
   rotationZText: {fileID: 2029551525143120163}
   scaleSlider: {fileID: 2232830456664892328}
   scaleText: {fileID: 6540486675464420907}
+  spawnCrossSectionButton: {fileID: 8632067136538598940}
+--- !u!114 &2523150741379064304
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7200251300199759454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6768bf9decb1b0b40aa93c10827d495a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 2
+  _addedNetworkObject: {fileID: 4344840452321603846}
+  _networkObjectCache: {fileID: 4344840452321603846}
+  crossSectionPlanePrefab: {fileID: 714467927515028049, guid: 5eafb98f7d87a764dbaf1ad569b7aa8a,
+    type: 3}
+  volumeRenderedObjectPrefab: {fileID: 687899278494396546, guid: de632d9d963a5a946820d266937fae6d,
+    type: 3}
 --- !u!1 &7251782805579967996
 GameObject:
   m_ObjectHideFlags: 0

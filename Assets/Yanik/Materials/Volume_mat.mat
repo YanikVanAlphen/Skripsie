@@ -25,6 +25,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
+  - CROSS_SECTION_ON
   - MODE_DVR
   - RAY_TERMINATE_ON
   m_InvalidKeywords: []

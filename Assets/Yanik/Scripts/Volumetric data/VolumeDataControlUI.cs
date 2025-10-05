@@ -29,6 +29,8 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   public Slider scaleSlider;
   public TextMeshProUGUI scaleText;
+
+  public Button spawnCrossSectionButton;
   // ---------------------------------------
 
   private VolumeRenderedObject volumeObject;
@@ -66,6 +68,8 @@ public class VolumeDataControlUI : NetworkBehaviour
       rotationIncrementButton = GameObject.Find("rot_pos_btn")?.GetComponent<Button>();
     if (rotationDecrementButton == null)
       rotationDecrementButton = GameObject.Find("rot_neg_btn")?.GetComponent<Button>();
+    if (spawnCrossSectionButton == null)
+      spawnCrossSectionButton = GameObject.Find("slice_plane_btn")?.GetComponent<Button>();
 
     // listeners to activate function on UI event handlers
     if (positionAxisDropdown != null)
@@ -82,6 +86,8 @@ public class VolumeDataControlUI : NetworkBehaviour
       rotationDecrementButton.onClick.AddListener(OnRotationDecrementClicked);
     if (scaleSlider != null)
       scaleSlider.onValueChanged.AddListener(OnScaleSliderChanged);
+    if (spawnCrossSectionButton != null)
+      spawnCrossSectionButton.onClick.AddListener(OnSpawnCrossSectionButtonClicked);
   }
 
   private IEnumerator FindVolumeObject()
@@ -441,6 +447,22 @@ public class VolumeDataControlUI : NetworkBehaviour
     Debug.Log($"Set scale to {value} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
 
     SetScaleServerRpc(value);
+  }
+
+  private void OnSpawnCrossSectionButtonClicked()
+  {
+    var crossSectionManager = GetComponent<CrossSectionManager>();
+    if (crossSectionManager == null)
+    {
+      Debug.LogError("Error: Could not find Cross Section Manager Component.");
+      return;
+    }
+    
+    Vector3 spawnPosition = new Vector3(2f, 1.5f, 2f);
+    Quaternion spawnRotation = Quaternion.Euler(0f, 0f, 0f);
+
+    crossSectionManager.SpawnCrossSectionPlaneServerRpc(spawnPosition, spawnRotation);
+    Debug.Log("Requested spawn of CrossSectionPlane.");
   }
 
   [ServerRpc(RequireOwnership = true)]
