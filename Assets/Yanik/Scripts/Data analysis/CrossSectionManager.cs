@@ -8,6 +8,7 @@ using UnityEngine;
 using UnityVolumeRendering;
 using System.Collections;
 using System.Linq;
+using FishNet.Object.Synchronizing;
 
 public class CrossSectionManager : NetworkBehaviour
 {
