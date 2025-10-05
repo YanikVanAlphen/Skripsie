@@ -20,29 +20,35 @@ public class CrossSectionManager : NetworkBehaviour
 
   private void Awake()
   {
+    StartCoroutine(WaitForNetworkReady());
+  }
+
+  private IEnumerator WaitForNetworkReady()
+  {
+    while (NetworkManager == null || (!NetworkManager.IsServer && !NetworkManager.ClientManager.Started))
+    {
+      yield return new WaitForSeconds(0.1f);
+    }
+    volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
     if (volumeDataNetworker == null)
     {
-      volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
-      if (volumeDataNetworker == null)
-      {
-        Debug.LogError("VolumeDataNetworker not found.");
-      }
+      Debug.LogError("VolumeDataNetworker not found in scene.");
+      yield break;
     }
-    // find the volume object when the script awakens
+
     StartCoroutine(FindVolumeObject());
   }
 
   private IEnumerator FindVolumeObject()
   {
-    // wait for VolumeDataNetworker to be assigned and network to initialize
-    while (volumeDataNetworker == null || NetworkManager == null || NetworkManager.ServerManager == null)
+    while (NetworkManager == null || NetworkManager.ServerManager == null)
     {
-      volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
+      // wait for NetworkManager and ServerManager init
       yield return new WaitForSeconds(0.1f);
     }
 
     int retryCount = 0;
-    const int maxRetries = 40;
+    const int maxRetries = 80;
     NetworkObject volumeNetworkObject = null;
 
     while (volumeNetworkObject == null && retryCount < maxRetries)
@@ -129,7 +135,7 @@ public class CrossSectionManager : NetworkBehaviour
   {
     NetworkObject networkObject = null;
     int retryCount = 0;
-    const int maxRetries = 40;
+    const int maxRetries = 80;
 
     while (networkObject == null && retryCount < maxRetries)
     {
