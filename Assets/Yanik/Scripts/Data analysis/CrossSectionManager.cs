@@ -14,6 +14,7 @@ public class CrossSectionManager : NetworkBehaviour
   [SerializeField] private GameObject crossSectionPlanePrefab;
   [SerializeField] private GameObject volumeRenderedObjectPrefab;
   private VolumeDataNetworker volumeDataNetworker;
+  private NetworkObject crossSectionNetObj;
 
   private VolumeRenderedObject volumeObject;
   private bool isCrossSectionSpawned = false;
@@ -80,10 +81,24 @@ public class CrossSectionManager : NetworkBehaviour
     Debug.Log($"Found VolumeRenderedObject (ObjectId={volumeNetworkObject.ObjectId}).");
   }
 
+  public override void OnStartClient() // explicitly let clients search for cutting plane after joining
+  {
+    base.OnStartClient(); // ensure default FishNet inits complete
+    if (!IsServer && isCrossSectionSpawned && crossSectionNetObj != null)
+    {
+      StartCoroutine(FindAndConfigureCrossSectionPlane(crossSectionNetObj.ObjectId, crossSectionNetObj.transform.position, crossSectionNetObj.transform.rotation));
+    }
+  }
+
   // spawn the cross-section plane
   [ServerRpc(RequireOwnership = false)]
   public void SpawnCrossSectionPlaneServerRpc(Vector3 position, Quaternion rotation, NetworkConnection conn = null)
   {
+    if (!IsServer) // only server may spawn the cross section - clients make request to spawn it
+    {
+      return;
+    }
+
     if (isCrossSectionSpawned)
     {
       return; // already spawned
@@ -91,18 +106,17 @@ public class CrossSectionManager : NetworkBehaviour
 
     if (volumeObject == null)
     {
-      Debug.LogError("VolumeRenderedObject not found.");
       return;
     }
 
     // instantiate and set up the plane
     GameObject crossSectionPlane = Instantiate(crossSectionPlanePrefab, position, rotation);
-    NetworkObject networkObject = crossSectionPlane.GetComponent<NetworkObject>();
+    NetworkObject crossSectionPlaneNetworkObject = crossSectionPlane.GetComponent<NetworkObject>();
     // CrossSectionPlane config
     CrossSectionPlane planeComponent = crossSectionPlane.GetComponent<CrossSectionPlane>();
     if (planeComponent != null)
     {
-      planeComponent.SetTargetObject(volumeObject);
+      planeComponent.SetTargetObject(volumeObject); // set target object to volumeobject so that plugin's cross section plane works
     }
     // set volume reference in CrossSectionSync
     CrossSectionSync syncComponent = crossSectionPlane.GetComponent<CrossSectionSync>();
@@ -114,10 +128,10 @@ public class CrossSectionManager : NetworkBehaviour
     // spawn CrossSectionPlane
     ServerManager.Spawn(crossSectionPlane);
     isCrossSectionSpawned = true;
-    Debug.Log($"Server spawned CrossSectionPlane, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
+    Debug.Log($"Server spawned CrossSectionPlane, ObjectId={crossSectionPlaneNetworkObject.ObjectId}, PrefabId={crossSectionPlaneNetworkObject.PrefabId}");
 
     // notify all clients
-    RpcSetCrossSectionPlane(networkObject.ObjectId, position, rotation);
+    RpcSetCrossSectionPlane(crossSectionPlaneNetworkObject.ObjectId, position, rotation);
   }
 
   // configure clients RPC
@@ -133,6 +147,12 @@ public class CrossSectionManager : NetworkBehaviour
   // find and configure the plane on clients
   private IEnumerator FindAndConfigureCrossSectionPlane(int objectId, Vector3 position, Quaternion rotation)
   {
+    while (volumeObject == null)
+    {
+      // wait for VolumeRenderedObject before config of CrossSectionPlane
+      yield return new WaitForSeconds(0.5f);
+    }
+
     NetworkObject networkObject = null;
     int retryCount = 0;
     const int maxRetries = 80;
