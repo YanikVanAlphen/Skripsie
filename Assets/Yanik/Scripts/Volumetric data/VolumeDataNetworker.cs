@@ -22,7 +22,8 @@ using VolumeData;
 public class VolumeDataNetworker : NetworkBehaviour
 {
   // private to other scripts but editable in inspector
-  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host
+  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host -- path to folder(DICOM, image sequence)/file(Image, Raw, etc.) containing data
+  // default position and rotation for volumetric data doesnt seem like it has much effect though
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
   [SerializeField] public GameObject volumeRenderedObjectPrefab; // Public for VolumeDataControlUI
@@ -32,7 +33,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   private GameObject canvasObject;
   private bool isVolumeSpawned;
   private bool isCanvasSpawned;
-  private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>();
+  private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>(); // map networkconnections to chunked data
   private byte[][] dataChunks; // Stored chunks for late-joining clients
   private DataSetLoader datasetLoader;
 
@@ -85,49 +86,49 @@ public class VolumeDataNetworker : NetworkBehaviour
     base.OnStartClient(); // ensure default FishNet functions run
     if (!IsServer)
     {
-      RequestCurrentDatasetServerRpc(NetworkManager.ClientManager.Connection);
+      RequestCurrentDatasetServerRpc(NetworkManager.ClientManager.Connection); // get current volumetric data from server to load in when client joins
     }
   }
 
-  private void RegisterPrefab()
-  {
-    if (volumeRenderedObjectPrefab == null)
-      return;
+  //private void RegisterPrefab()
+  //{
+  //  if (volumeRenderedObjectPrefab == null)
+  //    return;
 
-    NetworkObject prefabNetworkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
-    if (prefabNetworkObject != null)
-    {
-      PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
-      bool isRegistered = getRegistrationStatus(prefabObjects, prefabNetworkObject);
+  //  NetworkObject prefabNetworkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+  //  if (prefabNetworkObject != null)
+  //  {
+  //    PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
+  //    bool isRegistered = getRegistrationStatus(prefabObjects, prefabNetworkObject);
 
-      if (!isRegistered)
-      {
-        prefabObjects.AddObject(prefabNetworkObject);
-        Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId}.");
-      }
-      else
-      {
-        Debug.Log($"VolumeRenderedObjectPrefab (PrefabId={prefabNetworkObject.PrefabId}) already registered.");
-      }
-    }
-  }
+  //    if (!isRegistered)
+  //    {
+  //      prefabObjects.AddObject(prefabNetworkObject);
+  //      Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId}.");
+  //    }
+  //    else
+  //    {
+  //      Debug.Log($"VolumeRenderedObjectPrefab (PrefabId={prefabNetworkObject.PrefabId}) already registered.");
+  //    }
+  //  }
+  //}
 
-  private bool getRegistrationStatus(PrefabObjects prefabObjects, NetworkObject prefabNetworkObject)
-  {
-    bool registrationStatus = false;
-    if (prefabObjects.GetObjectCount() > 0)
-    {
-      for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
-      {
-        if (prefabObjects.GetObject(true, i) == prefabNetworkObject)
-        {
-          registrationStatus = true;
-          break;
-        }
-      }
-    }
-    return registrationStatus;
-  }
+  //private bool getRegistrationStatus(PrefabObjects prefabObjects, NetworkObject prefabNetworkObject)
+  //{
+  //  bool registrationStatus = false;
+  //  if (prefabObjects.GetObjectCount() > 0)
+  //  {
+  //    for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
+  //    {
+  //      if (prefabObjects.GetObject(true, i) == prefabNetworkObject)
+  //      {
+  //        registrationStatus = true;
+  //        break;
+  //      }
+  //    }
+  //  }
+  //  return registrationStatus;
+  //}
 
   [ServerRpc(RequireOwnership = false)]
   public void RequestLoadVolumeData(string newDatasetPath, Vector3 position, Quaternion rotation, NetworkConnection conn = null)
@@ -146,6 +147,7 @@ public class VolumeDataNetworker : NetworkBehaviour
       yield break;
     }
     // despawn existing VolumeRenderedObjects - dont want multiple data instances in single scene
+    // for when runtime dataloading functionality implemented
     foreach (var existingObj in FindObjectsOfType<VolumeRenderedObject>())
     {
       if (existingObj.gameObject != gameObject)
@@ -155,10 +157,10 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
     }
 
-    RegisterPrefab();
+    //RegisterPrefab();
 
     datasetLoader = new DataSetLoader(datasetPath); // create new datasetloader
-    VolumeDataset dataset = datasetLoader.LoadDataset();
+    VolumeDataset dataset = datasetLoader.LoadDataset(); // load data in
     if (dataset == null)
     {
       yield break;
@@ -195,7 +197,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     // spawn canvas to control data params/analysis tools
     if (!isCanvasSpawned)
     {
-      canvasObject = Instantiate(volumeControlCanvasPrefab, new Vector3(0f, 1.5f, 3.2f), Quaternion.Euler(0f, 0f, 0f));
+      canvasObject = Instantiate(volumeControlCanvasPrefab, new Vector3(0f, 1.5f, 3.2f), Quaternion.Euler(0f, 0f, 0f)); // instantiate new canvas instance and place at default position
       NetworkObject canvasNetworkObject = canvasObject.GetComponent<NetworkObject>();
       VolumeDataControlUI controlUI = canvasObject.GetComponent<VolumeDataControlUI>();
       controlUI.SetVolumeDataNetworker(this); // assign VolumeDataNetworker at runtime
@@ -236,7 +238,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private IEnumerator ReceiveDatasetChunk(int chunkIndex, int totalChunks, byte[] chunk)
   {
-    if (!chunkStorage.ContainsKey(NetworkManager.ClientManager.Connection))
+    if (!chunkStorage.ContainsKey(NetworkManager.ClientManager.Connection)) // does networkconnectione exist as a key? No? then init new chunkarray to store chunks for that client
     {
       chunkStorage[NetworkManager.ClientManager.Connection] = new byte[totalChunks][];
     }
@@ -246,7 +248,16 @@ public class VolumeDataNetworker : NetworkBehaviour
     // get all chunks for the current client
     byte[][] clientChunks = chunkStorage[NetworkManager.ClientManager.Connection];
     // check if all chunks have been received
-    bool allChunksReceived = clientChunks.All(chunk => chunk != null);
+    bool allChunksReceived = true;
+    foreach (var clientChunk in clientChunks)
+    {
+      if (clientChunk == null)
+      {
+        allChunksReceived = false;
+        break;
+      }
+    }
+
     if (allChunksReceived)
     {
       byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[NetworkManager.ClientManager.Connection]); // uncompress data

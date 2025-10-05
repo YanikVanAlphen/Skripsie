@@ -14,6 +14,7 @@ public class VolumeSync : NetworkBehaviour
     StartCoroutine(InitVolumeObject());
   }
 
+  // find volume object on startup, apply rendering settings and store to serve later RPCs
   private IEnumerator InitVolumeObject()
   {
     int retryCount = 0;

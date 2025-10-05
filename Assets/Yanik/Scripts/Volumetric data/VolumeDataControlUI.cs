@@ -451,7 +451,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void OnSpawnCrossSectionButtonClicked()
   {
-    var crossSectionManager = GetComponent<CrossSectionManager>();
+    var crossSectionManager = FindObjectOfType<CrossSectionManager>();
     if (crossSectionManager == null)
     {
       Debug.LogError("Error: Could not find Cross Section Manager Component.");
