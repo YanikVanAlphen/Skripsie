@@ -14,35 +14,37 @@ public class CrossSectionManager : NetworkBehaviour
   [SerializeField] private GameObject crossSectionPlanePrefab;
   [SerializeField] private GameObject volumeRenderedObjectPrefab;
   private VolumeDataNetworker volumeDataNetworker;
-  private NetworkObject crossSectionNetObj;
+  private NetworkObject crossSectionNetObj; // store cross section's NetworkObject
 
   private VolumeRenderedObject volumeObject;
-  private bool isCrossSectionSpawned = false;
-
-  private void Awake()
-  {
-    StartCoroutine(WaitForNetworkReady());
-  }
+  [SyncVar] private bool isCrossSectionSpawned = false;
 
   private IEnumerator WaitForNetworkReady()
   {
-    while (NetworkManager == null || (!NetworkManager.IsServer && !NetworkManager.ClientManager.Started))
+    int retryCount = 0;
+    const int maxRetries = 40;
+    while (volumeDataNetworker == null && retryCount < maxRetries)
     {
-      yield return new WaitForSeconds(0.1f);
+      volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
+      if (volumeDataNetworker == null)
+      {
+        retryCount++;
+        yield return new WaitForSeconds(0.1f);
+      }
     }
-    volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
+
     if (volumeDataNetworker == null)
     {
       Debug.LogError("VolumeDataNetworker not found in scene.");
       yield break;
     }
-
+    Debug.Log("Found VolumeDataNetworker.");
     StartCoroutine(FindVolumeObject());
   }
 
   private IEnumerator FindVolumeObject()
   {
-    while (NetworkManager == null || NetworkManager.ServerManager == null)
+    while (NetworkManager == null || NetworkManager.ServerManager == null || volumeDataNetworker == null)
     {
       // wait for NetworkManager and ServerManager init
       yield return new WaitForSeconds(0.1f);
@@ -52,12 +54,22 @@ public class CrossSectionManager : NetworkBehaviour
     const int maxRetries = 80;
     NetworkObject volumeNetworkObject = null;
 
+    int expectedPrefabId = -1;
+    if (volumeDataNetworker != null && volumeDataNetworker.volumeRenderedObjectPrefab != null)
+    {
+      NetworkObject prefabNetworkObject = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+      if (prefabNetworkObject != null)
+      {
+        expectedPrefabId = prefabNetworkObject.PrefabId; // use prefab of volumeRenderedObject to evaluate against spawned networkobjects
+      }
+    }
+
     while (volumeNetworkObject == null && retryCount < maxRetries)
     {
       // search through spawned networked objects for VolumeRenderedObject
       foreach (NetworkObject obj in NetworkManager.ServerManager.Objects.Spawned.Values)
       {
-        if (obj.GetComponent<VolumeRenderedObject>() != null)
+        if (obj.PrefabId == expectedPrefabId && obj.GetComponent<VolumeRenderedObject>() != null)
         {
           volumeNetworkObject = obj;
           break;
@@ -84,6 +96,7 @@ public class CrossSectionManager : NetworkBehaviour
   public override void OnStartClient() // explicitly let clients search for cutting plane after joining
   {
     base.OnStartClient(); // ensure default FishNet inits complete
+    StartCoroutine(WaitForNetworkReady());
     if (!IsServer && isCrossSectionSpawned && crossSectionNetObj != null)
     {
       StartCoroutine(FindAndConfigureCrossSectionPlane(crossSectionNetObj.ObjectId, crossSectionNetObj.transform.position, crossSectionNetObj.transform.rotation));
@@ -111,7 +124,7 @@ public class CrossSectionManager : NetworkBehaviour
 
     // instantiate and set up the plane
     GameObject crossSectionPlane = Instantiate(crossSectionPlanePrefab, position, rotation);
-    NetworkObject crossSectionPlaneNetworkObject = crossSectionPlane.GetComponent<NetworkObject>();
+    crossSectionNetObj = crossSectionPlane.GetComponent<NetworkObject>();
     // CrossSectionPlane config
     CrossSectionPlane planeComponent = crossSectionPlane.GetComponent<CrossSectionPlane>();
     if (planeComponent != null)
@@ -128,10 +141,10 @@ public class CrossSectionManager : NetworkBehaviour
     // spawn CrossSectionPlane
     ServerManager.Spawn(crossSectionPlane);
     isCrossSectionSpawned = true;
-    Debug.Log($"Server spawned CrossSectionPlane, ObjectId={crossSectionPlaneNetworkObject.ObjectId}, PrefabId={crossSectionPlaneNetworkObject.PrefabId}");
+    Debug.Log($"Server spawned CrossSectionPlane, ObjectId={crossSectionNetObj.ObjectId}, PrefabId={crossSectionNetObj.PrefabId}");
 
     // notify all clients
-    RpcSetCrossSectionPlane(crossSectionPlaneNetworkObject.ObjectId, position, rotation);
+    RpcSetCrossSectionPlane(crossSectionNetObj.ObjectId, position, rotation);
   }
 
   // configure clients RPC
