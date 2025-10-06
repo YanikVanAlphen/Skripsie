@@ -349,7 +349,7 @@ namespace uMuVR
       {
         Debug.Log($"OwnershipManager: Ownership confirmed for {gameObject.name} (ObjectId={NetworkObject.ObjectId}) by client {NetworkObject.Owner.ClientId}.");
         CancelInvoke(nameof(CheckOwnership));
-        
+
         var no = GetComponent<NetworkObject>();
         if (no != null && no.Owner != null)
         {
@@ -357,7 +357,7 @@ namespace uMuVR
         }
         return;
       }
-      
+
       if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + OWNERSHIP_RETRY_INTERVAL)
         return;
 
