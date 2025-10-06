@@ -24,6 +24,43 @@ public class CrossSectionSync : NetworkBehaviour
     }
   }
 
+  public override void OnStartClient()
+  {
+    base.OnStartClient();
+    crossSectionPlane = GetComponent<CrossSectionPlane>();
+    StartCoroutine(ConfigureLocalVolume());
+  }
+
+  private IEnumerator ConfigureLocalVolume()
+  {
+    int retryCount = 0;
+    const int maxRetries = 50;
+    while (volumeObject == null || volumeObject.dataset == null)
+    {
+      volumeObject = FindObjectOfType<VolumeRenderedObject>();
+      if (volumeObject == null)
+      {
+        if (retryCount >= maxRetries)
+        {
+          yield break;
+        }
+        retryCount++;
+        yield return new WaitForSeconds(0.2f);
+        continue;
+      }
+
+      if (volumeObject.dataset == null)
+      {
+        Debug.Log($"CrossSectionSync: VolumeRenderedObject found but dataset not ready, waiting...");
+        yield return new WaitForSeconds(0.5f);
+      }
+    }
+
+    lastVolumeScale = volumeObject.transform.localScale;
+    UpdatePlaneScale();
+    StartCoroutine(CheckVolumeScale());
+  }
+
   private IEnumerator CheckVolumeScale()
   {
     while (true)

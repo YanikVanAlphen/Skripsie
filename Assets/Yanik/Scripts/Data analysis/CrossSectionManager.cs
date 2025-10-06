@@ -79,7 +79,6 @@ public class CrossSectionManager : NetworkBehaviour
           yield break;
         }
       }
-
       retryCount++;
       yield return new WaitForSeconds(0.5f);
     }
@@ -118,10 +117,6 @@ public class CrossSectionManager : NetworkBehaviour
 
     isCrossSectionSpawned = true;
     Debug.Log($"Server spawned CrossSectionPlane (ObjectId={crossSectionNetObj.ObjectId})");
-
-    // Notify clients to configure
-    //ConfigurePlaneObserversRpc(crossSectionNetObj.ObjectId);
-    StartCoroutine(DelayConfigurePlaneObservers(crossSectionNetObj.ObjectId));
   }
 
   private IEnumerator DelayConfigurePlaneObservers(int objectId)
