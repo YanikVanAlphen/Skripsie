@@ -72,14 +72,10 @@ public class VolumeDataControlUI : NetworkBehaviour
       spawnCrossSectionButton = GameObject.Find("slice_plane_btn")?.GetComponent<Button>();
 
     // listeners to activate function on UI event handlers
-    if (positionAxisDropdown != null)
-      positionAxisDropdown.onValueChanged.AddListener(OnPositionAxisChanged);
     if (positionIncrementButton != null)
       positionIncrementButton.onClick.AddListener(OnPositionIncrementClicked);
     if (positionDecrementButton != null)
       positionDecrementButton.onClick.AddListener(OnPositionDecrementClicked);
-    if (rotationAxisDropdown != null)
-      rotationAxisDropdown.onValueChanged.AddListener(OnRotationAxisChanged);
     if (rotationIncrementButton != null)
       rotationIncrementButton.onClick.AddListener(OnRotationIncrementClicked);
     if (rotationDecrementButton != null)
@@ -232,16 +228,6 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  private void OnPositionAxisChanged(int index)
-  {
-    Debug.Log($"Position axis changed to: {positionAxisDropdown.options[index].text}");
-  }
-
-  private void OnRotationAxisChanged(int index)
-  {
-    Debug.Log($"Rotation axis changed to: {rotationAxisDropdown.options[index].text}");
-  }
-
   private void OnPositionIncrementClicked()
   {
     if (CanInteract() == false)
@@ -279,8 +265,8 @@ public class VolumeDataControlUI : NetworkBehaviour
         break;
     }
 
-    volumeObject.transform.position = newPos;
-    Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+    //volumeObject.transform.position = newPos;
+    //Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
 
     SetPositionServerRpc(newPos);
   }
@@ -322,8 +308,8 @@ public class VolumeDataControlUI : NetworkBehaviour
         break;
     }
 
-    volumeObject.transform.position = newPos;
-    Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+    //volumeObject.transform.position = newPos;
+    //Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
 
     SetPositionServerRpc(newPos);
   }
@@ -367,7 +353,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     Quaternion deltaRotation = Quaternion.AngleAxis(rotationIncrement, rotationAxis);
     Quaternion newRot = volumeObject.transform.rotation * deltaRotation; // apply change in rotation relative to current rotation
-    volumeObject.transform.rotation = newRot;
+    //volumeObject.transform.rotation = newRot;
 
     Vector3 euler = newRot.eulerAngles;
     euler.x = NormalizeAngle(euler.x);
@@ -417,7 +403,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     Quaternion deltaRotation = Quaternion.AngleAxis(-rotationIncrement, rotationAxis);
     Quaternion newRot = volumeObject.transform.rotation * deltaRotation;
-    volumeObject.transform.rotation = newRot;
+    //volumeObject.transform.rotation = newRot;
 
     Vector3 euler = newRot.eulerAngles;
     euler.x = NormalizeAngle(euler.x);
@@ -443,7 +429,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
 
     Vector3 newScale = new Vector3(value, value, value); // Uniform scaling
-    volumeObject.transform.localScale = newScale;
+    //volumeObject.transform.localScale = newScale;
     Debug.Log($"Set scale to {value} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
 
     SetScaleServerRpc(value);
@@ -475,13 +461,14 @@ public class VolumeDataControlUI : NetworkBehaviour
     spawnCrossSectionButton.interactable = true;
   }
 
-  [ServerRpc(RequireOwnership = true)]
+  [ServerRpc(RequireOwnership = false)]
   private void SetPositionServerRpc(Vector3 newPos) // make sure change is approved by server before clients see the update
   {
     SetPositionClientRpc(newPos);
   }
 
-  [Client]
+  //[Client]
+  [ObserversRpc]
   private void SetPositionClientRpc(Vector3 newPos) // runs on clients to execute actual change in client's local scene -> synched with server state
   {
     if (volumeObject != null)
@@ -491,13 +478,14 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  [ServerRpc(RequireOwnership = true)]
+  [ServerRpc(RequireOwnership = false)]
   private void SetScaleServerRpc(float scale)
   {
     SetScaleClientRpc(scale);
   }
 
-  [Client]
+  //[Client]
+  [ObserversRpc]
   private void SetScaleClientRpc(float scale)
   {
     if (volumeObject != null)
@@ -507,13 +495,14 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  [ServerRpc(RequireOwnership = true)]
+  [ServerRpc(RequireOwnership = false)]
   private void SetRotationServerRpc(Quaternion newRot)
   {
     SetRotationClientRpc(newRot);
   }
 
-  [Client]
+  //[Client]
+  [ObserversRpc]
   private void SetRotationClientRpc(Quaternion newRot)
   {
     if (volumeObject != null)

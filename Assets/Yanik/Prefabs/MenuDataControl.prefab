@@ -4373,6 +4373,7 @@ GameObject:
   - component: {fileID: 664930613836434806}
   - component: {fileID: 2134901569356180814}
   - component: {fileID: 2523150741379064304}
+  - component: {fileID: 6310017634735129508}
   m_Layer: 5
   m_Name: MenuDataControl
   m_TagString: Untagged
@@ -4420,7 +4421,7 @@ MonoBehaviour:
   _isGlobal: 0
   _defaultDespawnType: 0
   NetworkObserver: {fileID: 0}
-  <PrefabId>k__BackingField: -1
+  <PrefabId>k__BackingField: 5
   _scenePathHash: 0
   <SceneId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 6744319985978708338
@@ -4498,8 +4499,23 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 4344840452321603846}
   crossSectionPlanePrefab: {fileID: 714467927515028049, guid: 5eafb98f7d87a764dbaf1ad569b7aa8a,
     type: 3}
-  volumeRenderedObjectPrefab: {fileID: 687899278494396546, guid: de632d9d963a5a946820d266937fae6d,
-    type: 3}
+  isCrossSectionSpawned: 0
+  crossSectionNetObj: {fileID: 0}
+--- !u!114 &6310017634735129508
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7200251300199759454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2aaecc057afee174d8db587928f20f0b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 4344840452321603846}
+  _networkObjectCache: {fileID: 0}
 --- !u!1 &7251782805579967996
 GameObject:
   m_ObjectHideFlags: 0
