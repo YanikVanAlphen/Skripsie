@@ -136,7 +136,7 @@ public class CrossSectionManager : NetworkBehaviour
   {
     int datasetRetryCount = 0;
     const int maxDatasetRetries = 50;
-    while (volumeObject.dataset == null && volumeObject == null)
+    while (volumeObject == null && volumeObject.dataset == null)
     {
       if (datasetRetryCount >= maxDatasetRetries)
       {
