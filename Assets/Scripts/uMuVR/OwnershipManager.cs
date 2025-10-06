@@ -332,7 +332,7 @@ namespace uMuVR
       }
 
       Debug.Log($"RequestOwnershipServerRpc: Called by client {clientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId})");
-      if (NetworkObject.Owner == requester)
+      if (NetworkObject.Owner != requester) // transfer ownership if requester is NOT aleady owner
       {
         NetworkObject.GiveOwnership(requester);
         Debug.Log($"OwnershipManager: Server granted ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) to client {clientId}.");

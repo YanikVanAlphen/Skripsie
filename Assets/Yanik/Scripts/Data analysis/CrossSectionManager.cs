@@ -140,6 +140,19 @@ public class CrossSectionManager : NetworkBehaviour
       yield return new WaitForSeconds(0.2f);
     }
 
+    int datasetRetryCount = 0;
+    const int maxDatasetRetries = 30;
+    while (volumeObject.dataset == null && datasetRetryCount < maxDatasetRetries)
+    {
+      datasetRetryCount++;
+      yield return new WaitForSeconds(0.2f);
+    }
+    if (volumeObject.dataset == null)
+    {
+      Debug.LogError($"Client failed to configure CrossSectionPlane (ObjectId={objectId}).");
+      yield break;
+    }
+
     // Find the spawned plane
     NetworkObject planeNetObj = null;
     int retryCount = 0;
@@ -171,7 +184,7 @@ public class CrossSectionManager : NetworkBehaviour
     if (planeNetObj != null)
     {
       var planeComponent = planeNetObj.GetComponent<CrossSectionPlane>();
-      if (planeComponent != null && volumeObject != null)
+      if (planeComponent != null)
       {
         planeComponent.SetTargetObject(volumeObject);
         Debug.Log($"Client configured CrossSectionPlane (ObjectId={objectId})");

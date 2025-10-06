@@ -451,6 +451,11 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void OnSpawnCrossSectionButtonClicked()
   {
+    if (spawnCrossSectionButton != null)
+    {
+      spawnCrossSectionButton.interactable = false; // disable to prevent double click spawning
+      Invoke(nameof(ReenableSpawnButton), 1f); // reenable after 1 second
+    }
     var crossSectionManager = FindObjectOfType<CrossSectionManager>();
     if (crossSectionManager == null)
     {
@@ -463,6 +468,11 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     crossSectionManager.SpawnCrossSectionPlaneServerRpc(spawnPosition, spawnRotation, NetworkManager.ClientManager.Connection);
     Debug.Log("Requested spawn of CrossSectionPlane.");
+  }
+
+  private void ReenableSpawnButton()
+  {
+    spawnCrossSectionButton.interactable = true;
   }
 
   [ServerRpc(RequireOwnership = true)]
