@@ -134,23 +134,16 @@ public class CrossSectionManager : NetworkBehaviour
 
   private IEnumerator ConfigurePlaneOnClient(int objectId)
   {
-    // Wait for volume if not ready
-    while (volumeObject == null)
-    {
-      yield return new WaitForSeconds(0.2f);
-    }
-
     int datasetRetryCount = 0;
-    const int maxDatasetRetries = 30;
-    while (volumeObject.dataset == null && datasetRetryCount < maxDatasetRetries)
+    const int maxDatasetRetries = 50;
+    while (volumeObject.dataset == null && volumeObject == null)
     {
+      if (datasetRetryCount >= maxDatasetRetries)
+      {
+        yield break;
+      }
       datasetRetryCount++;
       yield return new WaitForSeconds(0.2f);
-    }
-    if (volumeObject.dataset == null)
-    {
-      Debug.LogError($"Client failed to configure CrossSectionPlane (ObjectId={objectId}).");
-      yield break;
     }
 
     // Find the spawned plane

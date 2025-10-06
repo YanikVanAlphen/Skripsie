@@ -313,11 +313,6 @@ public class VolumeDataNetworker : NetworkBehaviour
           {
             volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
           }
-          Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
-          if (volumeContainer == null)
-          {
-            yield break;
-          }
           Debug.Log($"Client found NetworkObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
         }
       }
