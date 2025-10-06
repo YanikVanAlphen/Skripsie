@@ -70,7 +70,7 @@ public class VolumeSync : NetworkBehaviour
     }
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = false)] // all clients allowed to call this function
   public void UpdateVisibleRange(Vector2 range)
   {
     if (volumeObject != null)
@@ -81,7 +81,7 @@ public class VolumeSync : NetworkBehaviour
     }
   }
 
-  [ObserversRpc]
+  [ObserversRpc] // propagate the updated change to all other clients
   private void RpcUpdateVisibleRange(Vector2 range)
   {
     if (volumeObject != null)

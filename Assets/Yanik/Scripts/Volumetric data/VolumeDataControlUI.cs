@@ -461,7 +461,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     Vector3 spawnPosition = new Vector3(2f, 1.5f, 2f);
     Quaternion spawnRotation = Quaternion.Euler(0f, 0f, 0f);
 
-    crossSectionManager.SpawnCrossSectionPlaneServerRpc(spawnPosition, spawnRotation);
+    crossSectionManager.SpawnCrossSectionPlaneServerRpc(spawnPosition, spawnRotation, NetworkManager.ClientManager.Connection);
     Debug.Log("Requested spawn of CrossSectionPlane.");
   }
 

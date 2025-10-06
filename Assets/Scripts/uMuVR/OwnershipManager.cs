@@ -187,7 +187,7 @@ namespace uMuVR
       {
         Debug.Log($"OwnershipManager: Already owner (ClientId={no.Owner.ClientId}) for {gameObject.name}.");
       }
-      TransferCanvasOwnership(no.Owner);
+      //TransferCanvasOwnership(no.Owner);
       selectionCount++;
       LogNetworkTransformState();
     }
@@ -215,7 +215,7 @@ namespace uMuVR
       {
         Debug.Log($"OwnershipManager: Already owner (ClientId={no.Owner.ClientId}) for {gameObject.name}.");
       }
-      TransferCanvasOwnership(no.Owner);
+      //TransferCanvasOwnership(no.Owner);
       selectionCount++;
       LogNetworkTransformState();
     }
@@ -332,7 +332,7 @@ namespace uMuVR
       }
 
       Debug.Log($"RequestOwnershipServerRpc: Called by client {clientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId})");
-      if (!NetworkObject.IsOwner)
+      if (NetworkObject.Owner == requester)
       {
         NetworkObject.GiveOwnership(requester);
         Debug.Log($"OwnershipManager: Server granted ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) to client {clientId}.");
@@ -349,9 +349,15 @@ namespace uMuVR
       {
         Debug.Log($"OwnershipManager: Ownership confirmed for {gameObject.name} (ObjectId={NetworkObject.ObjectId}) by client {NetworkObject.Owner.ClientId}.");
         CancelInvoke(nameof(CheckOwnership));
+        
+        var no = GetComponent<NetworkObject>();
+        if (no != null && no.Owner != null)
+        {
+          TransferCanvasOwnership(no.Owner);
+        }
         return;
       }
-
+      
       if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + OWNERSHIP_RETRY_INTERVAL)
         return;
 

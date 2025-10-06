@@ -90,45 +90,45 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  //private void RegisterPrefab()
-  //{
-  //  if (volumeRenderedObjectPrefab == null)
-  //    return;
+  private void RegisterPrefab()
+  {
+    if (volumeRenderedObjectPrefab == null)
+      return;
 
-  //  NetworkObject prefabNetworkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
-  //  if (prefabNetworkObject != null)
-  //  {
-  //    PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
-  //    bool isRegistered = getRegistrationStatus(prefabObjects, prefabNetworkObject);
+    NetworkObject prefabNetworkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+    if (prefabNetworkObject != null)
+    {
+      PrefabObjects prefabObjects = NetworkManager.SpawnablePrefabs;
+      bool isRegistered = getRegistrationStatus(prefabObjects, prefabNetworkObject);
 
-  //    if (!isRegistered)
-  //    {
-  //      prefabObjects.AddObject(prefabNetworkObject);
-  //      Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId}.");
-  //    }
-  //    else
-  //    {
-  //      Debug.Log($"VolumeRenderedObjectPrefab (PrefabId={prefabNetworkObject.PrefabId}) already registered.");
-  //    }
-  //  }
-  //}
+      if (!isRegistered)
+      {
+        prefabObjects.AddObject(prefabNetworkObject);
+        Debug.Log($"Registered VolumeRenderedObjectPrefab with PrefabId={prefabNetworkObject.PrefabId}.");
+      }
+      else
+      {
+        Debug.Log($"VolumeRenderedObjectPrefab (PrefabId={prefabNetworkObject.PrefabId}) already registered.");
+      }
+    }
+  }
 
-  //private bool getRegistrationStatus(PrefabObjects prefabObjects, NetworkObject prefabNetworkObject)
-  //{
-  //  bool registrationStatus = false;
-  //  if (prefabObjects.GetObjectCount() > 0)
-  //  {
-  //    for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
-  //    {
-  //      if (prefabObjects.GetObject(true, i) == prefabNetworkObject)
-  //      {
-  //        registrationStatus = true;
-  //        break;
-  //      }
-  //    }
-  //  }
-  //  return registrationStatus;
-  //}
+  private bool getRegistrationStatus(PrefabObjects prefabObjects, NetworkObject prefabNetworkObject) // is this needed since already registered in SpawnAble prefabs now?
+  {
+    bool registrationStatus = false;
+    if (prefabObjects.GetObjectCount() > 0)
+    {
+      for (int i = 0; i < prefabObjects.GetObjectCount(); i++)
+      {
+        if (prefabObjects.GetObject(true, i) == prefabNetworkObject)
+        {
+          registrationStatus = true;
+          break;
+        }
+      }
+    }
+    return registrationStatus;
+  }
 
   [ServerRpc(RequireOwnership = false)]
   public void RequestLoadVolumeData(string newDatasetPath, Vector3 position, Quaternion rotation, NetworkConnection conn = null)
@@ -157,7 +157,7 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
     }
 
-    //RegisterPrefab();
+    RegisterPrefab();
 
     datasetLoader = new DataSetLoader(datasetPath); // create new datasetloader
     VolumeDataset dataset = datasetLoader.LoadDataset(); // load data in
@@ -336,11 +336,6 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
       networkObject = volumeObject.GetComponent<NetworkObject>();
       Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
-      if (volumeContainer == null)
-      {
-        Debug.LogError($"Server: VolumeContainer child missing on VolumeRenderedObject (ObjectId={networkObject.ObjectId}).");
-        yield break;
-      }
     }
 
     datasetLoader = new DataSetLoader(); // create new datasetloader

@@ -10,6 +10,7 @@ using System.Collections;
 using System.Linq;
 using FishNet.Object.Synchronizing;
 using System.Collections.Generic;
+using uMuVR;
 
 public class CrossSectionManager : NetworkBehaviour
 {
@@ -87,7 +88,7 @@ public class CrossSectionManager : NetworkBehaviour
   }
 
   [ServerRpc(RequireOwnership = false)]
-  public void SpawnCrossSectionPlaneServerRpc(Vector3 position, Quaternion rotation)
+  public void SpawnCrossSectionPlaneServerRpc(Vector3 position, Quaternion rotation, NetworkConnection requester = null)
   {
     if (!IsServer || isCrossSectionSpawned || volumeObject == null)
     {
@@ -105,7 +106,16 @@ public class CrossSectionManager : NetworkBehaviour
     if (syncComponent != null)
       syncComponent.SetVolumeObject(volumeObject);
 
+    var ownershipManager = plane.GetComponent<OwnershipManager>();
+
     ServerManager.Spawn(plane);
+
+    if (requester != null)
+    {
+      crossSectionNetObj.GiveOwnership(requester);
+      Debug.Log($"Gave initial ownership of CrossSectionPlane to client {requester.ClientId}");
+    }
+
     isCrossSectionSpawned = true;
     Debug.Log($"Server spawned CrossSectionPlane (ObjectId={crossSectionNetObj.ObjectId})");
 
@@ -133,25 +143,47 @@ public class CrossSectionManager : NetworkBehaviour
     // Find the spawned plane
     NetworkObject planeNetObj = null;
     int retryCount = 0;
+    const int maxRetries = 50;
 
-    while (planeNetObj == null && retryCount < 40)
+    while (planeNetObj == null && retryCount < maxRetries)
     {
-      var spawnedObjects = NetworkManager.ClientManager.Objects.Spawned;
-
-      if (spawnedObjects != null && spawnedObjects.TryGetValue(objectId, out planeNetObj))
+      if (NetworkManager.ClientManager.Objects.Spawned.TryGetValue(objectId, out planeNetObj))
       {
-        var planeComponent = planeNetObj.GetComponent<CrossSectionPlane>();
-        if (planeComponent != null)
-          planeComponent.SetTargetObject(volumeObject);
-
-        Debug.Log($"Client configured CrossSectionPlane (ObjectId={objectId})");
-        yield break;
+        break;
       }
 
-      retryCount++;
-      yield return new WaitForSeconds(0.2f);
+      foreach (var nob in FindObjectsOfType<NetworkObject>())
+      {
+        if (nob.ObjectId == objectId)
+        {
+          planeNetObj = nob;
+          break;
+        }
+      }
+      if (planeNetObj == null)
+      {
+        Debug.Log($"Client waiting for CrossSectionPlane {objectId}, attempt {retryCount + 1}/{maxRetries}");
+        retryCount++;
+        yield return new WaitForSeconds(0.3f);
+      }
     }
 
-    Debug.LogError($"Client failed to find CrossSectionPlane (ObjectId={objectId})");
+    if (planeNetObj != null)
+    {
+      var planeComponent = planeNetObj.GetComponent<CrossSectionPlane>();
+      if (planeComponent != null && volumeObject != null)
+      {
+        planeComponent.SetTargetObject(volumeObject);
+        Debug.Log($"Client configured CrossSectionPlane (ObjectId={objectId})");
+      }
+      else
+      {
+        Debug.LogError($"Missing component - Plane: {(planeComponent != null)}, Volume: {(volumeObject != null)}");
+      }
+    }
+    else
+    {
+      Debug.LogError($"Client failed to find CrossSectionPlane (ObjectId={objectId}) after {maxRetries} retries");
+    }
   }
 }
