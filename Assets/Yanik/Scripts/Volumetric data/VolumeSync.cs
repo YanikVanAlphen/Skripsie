@@ -2,6 +2,7 @@ using FishNet.Object;
 using UnityEngine;
 using UnityVolumeRendering; // Volume rendering plugin from mlavik
 using System.Collections;
+
 /// <summary>
 /// Manages any networked changes to the rendering of volumetric data
 /// </summary>
@@ -30,13 +31,29 @@ public class VolumeSync : NetworkBehaviour
     }
 
     if (volumeObject == null)
-    {
-      Debug.LogError("Failed to find VolumeRenderedObject.");
       yield break;
-    }
-
-    Debug.Log("VolumeSync found VolumeRenderedObject.");
     ApplyRenderSettings();
+  }
+
+  [ServerRpc(RequireOwnership = false)]
+  public void UpdateScaleServerRpc(Vector3 scale)
+  {
+    if (volumeObject != null)
+    {
+      volumeObject.transform.localScale = scale;
+      RpcUpdateScale(scale);
+      Debug.Log($"VolumeSync: Server updated VolumeRenderedObject scale to {scale}");
+    }
+  }
+
+  [ObserversRpc]
+  private void RpcUpdateScale(Vector3 scale)
+  {
+    if (volumeObject != null)
+    {
+      volumeObject.transform.localScale = scale;
+      Debug.Log($"VolumeSync: Client updated VolumeRenderedObject scale to {scale}");
+    }
   }
 
   private void ApplyRenderSettings()
@@ -45,7 +62,7 @@ public class VolumeSync : NetworkBehaviour
     {
       volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
       volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
-      Debug.Log("Applied initial render settings to volumetric dataset.");
+      Debug.Log("VolumeSync: Applied initial render settings to volumetric dataset.");
     }
   }
 
@@ -56,7 +73,7 @@ public class VolumeSync : NetworkBehaviour
     {
       volumeObject.SetRenderMode(mode);
       RpcUpdateRenderMode(mode);
-      Debug.Log($"Render mode updated to {mode}");
+      Debug.Log($"VolumeSync: Render mode updated to {mode}");
     }
   }
 
@@ -66,7 +83,7 @@ public class VolumeSync : NetworkBehaviour
     if (volumeObject != null)
     {
       volumeObject.SetRenderMode(mode);
-      Debug.Log($"Client updated render mode to {mode}");
+      Debug.Log($"VolumeSync: Client updated render mode to {mode}");
     }
   }
 
@@ -77,7 +94,7 @@ public class VolumeSync : NetworkBehaviour
     {
       volumeObject.SetVisibilityWindow(range);
       RpcUpdateVisibleRange(range);
-      Debug.Log($"Visibility window updated to {range}");
+      Debug.Log($"VolumeSync: Visibility window updated to {range}");
     }
   }
 
@@ -87,7 +104,7 @@ public class VolumeSync : NetworkBehaviour
     if (volumeObject != null)
     {
       volumeObject.SetVisibilityWindow(range);
-      Debug.Log($"Client updated visibility window to {range}");
+      Debug.Log($"VolumeSync: Client updated visibility window to {range}");
     }
   }
 }

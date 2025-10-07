@@ -14,6 +14,7 @@ public class TeleportProviderAssigner : MonoBehaviour
       return;
     }
 
+    // find all teleportation areas in scene (the floor) and add user teleportation provider to enable teleport movement function
     TeleportationArea[] areas = FindObjectsOfType<TeleportationArea>();
     foreach (TeleportationArea area in areas)
     {

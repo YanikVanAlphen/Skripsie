@@ -23,31 +23,31 @@ public class CrossSectionManager : NetworkBehaviour
   public override void OnStartClient()
   {
     base.OnStartClient();
-    StartCoroutine(InitializeManager());
+    StartCoroutine(InitManager());
   }
 
-  private IEnumerator InitializeManager()
+  private IEnumerator InitManager()
   {
-    // Find VolumeDataNetworker
+    // find VolumeDataNetworker
     while (volumeDataNetworker == null)
     {
       volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
       yield return new WaitForSeconds(0.1f);
     }
 
-    // Find VolumeRenderedObject
+    // find VolumeRenderedObject
     yield return StartCoroutine(FindVolumeObject());
   }
 
   private IEnumerator FindVolumeObject()
   {
-    // Wait for NetworkManager
+    // wait for NetworkManager
     while (NetworkManager == null || (IsServer && NetworkManager.ServerManager == null) || (!IsServer && NetworkManager.ClientManager == null) || volumeDataNetworker == null)
     {
       yield return new WaitForSeconds(0.1f);
     }
 
-    int expectedPrefabId = -1;
+    int expectedPrefabId = -1; // default is invalid ID
     if (volumeDataNetworker.volumeRenderedObjectPrefab != null)
     {
       NetworkObject prefabNetObj = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
@@ -82,7 +82,6 @@ public class CrossSectionManager : NetworkBehaviour
       retryCount++;
       yield return new WaitForSeconds(0.5f);
     }
-
     Debug.LogError("Failed to find VolumeRenderedObject.");
   }
 
@@ -90,12 +89,11 @@ public class CrossSectionManager : NetworkBehaviour
   public void SpawnCrossSectionPlaneServerRpc(Vector3 position, Quaternion rotation, NetworkConnection requester = null)
   {
     if (!IsServer || isCrossSectionSpawned || volumeObject == null || volumeObject.dataset == null)
-    {
       return;
-    }
 
     GameObject plane = Instantiate(crossSectionPlanePrefab, position, rotation);
-    crossSectionNetObj = plane.GetComponent<NetworkObject>(); // set stored NetworkObject so we dont have to search again later
+    // set stored NetworkObject so we dont have to search again later
+    crossSectionNetObj = plane.GetComponent<NetworkObject>();
     // Configure plane components
     var planeComponent = plane.GetComponent<CrossSectionPlane>();
     if (planeComponent != null)
@@ -112,16 +110,16 @@ public class CrossSectionManager : NetworkBehaviour
     if (requester != null)
     {
       crossSectionNetObj.GiveOwnership(requester);
-      Debug.Log($"Gave initial ownership of CrossSectionPlane to client {requester.ClientId}");
+      Debug.Log($"Gave initial ownership of CrossSectionPlane to Client: {requester.ClientId}");
     }
 
     isCrossSectionSpawned = true;
-    Debug.Log($"Server spawned CrossSectionPlane (ObjectId={crossSectionNetObj.ObjectId})");
+    Debug.Log($"Spawned CrossSectionPlane (ObjectId={crossSectionNetObj.ObjectId})");
   }
 
   private IEnumerator DelayConfigurePlaneObservers(int objectId)
   {
-    Debug.Log($"Server waiting for dataset before notifying clients (ObjectId={objectId})");
+    Debug.Log($"Waiting for dataset before notifying clients (ObjectId={objectId})");
     int retryCount = 0;
     const int maxRetries = 50;
     while (volumeObject == null || volumeObject.dataset == null)
@@ -135,16 +133,14 @@ public class CrossSectionManager : NetworkBehaviour
     }
 
     ConfigurePlaneObserversRpc(objectId);
-    Debug.Log($"Server notified clients to configure CrossSectionPlane (ObjectId={objectId})");
+    Debug.Log($"Notified clients to config CrossSectionPlane (ObjectId={objectId})");
   }
 
   [ObserversRpc]
   private void ConfigurePlaneObserversRpc(int objectId)
   {
     if (!IsServer)
-    {
       StartCoroutine(ConfigurePlaneOnClient(objectId));
-    }
   }
 
   private IEnumerator ConfigurePlaneOnClient(int objectId)

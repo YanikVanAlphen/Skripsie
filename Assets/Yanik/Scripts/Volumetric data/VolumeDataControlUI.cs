@@ -7,6 +7,7 @@ using System.Collections;
 using TMPro;
 using System.Linq;
 using System;
+using uMuVR;
 
 public class VolumeDataControlUI : NetworkBehaviour
 {
@@ -34,44 +35,27 @@ public class VolumeDataControlUI : NetworkBehaviour
   // ---------------------------------------
 
   private VolumeRenderedObject volumeObject;
-  private const float positionIncrement = 0.1f; // Small increment for position
+  private const float positionIncrement = 0.05f; // Small increment for position
   private const float rotationIncrement = 5f;   // Small increment for rotation
 
   private void Start()
   {
     if (volumeDataNetworker == null)
     {
+      // runtime assignment of VolumeDataNetworker component since the data menu spawns at runtime
       volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
-      if (volumeDataNetworker == null)
-      {
-        Debug.LogError("No VolumeDataNetworker found in scene. Ensure it is assigned to VolumeDataControl canvas menu.");
-        return;
-      }
-      Debug.LogWarning("VolumeDataNetworker was unassigned in Data Menu, found it via FindObjectOfType.");
     }
-
-    StartCoroutine(FindVolumeObject());
+    if (volumeDataNetworker != null)
+      volumeDataNetworker.OnVolumeSpawned += OnVolumeSpawned; // subscribe to OnVolumeSpawned event to know when to start searching for the VolumeObject - make sure timing is right
     SetupUI();
     UpdateInteractableState();
+    // continually update menu labels as the volume is manipulated
     StartCoroutine(UpdateLabels());
   }
 
   private void SetupUI()
   {
-    // wierd bug, cant seem to attach the buttons to script in UI so this is next best option
-    // null-conditional operators ensures null returned without null reference exception thrown when a button with certain name isnt found
-    if (positionIncrementButton == null)
-      positionIncrementButton = GameObject.Find("position_pos_btn")?.GetComponent<Button>();
-    if (positionDecrementButton == null)
-      positionDecrementButton = GameObject.Find("position_neg_btn")?.GetComponent<Button>();
-    if (rotationIncrementButton == null)
-      rotationIncrementButton = GameObject.Find("rot_pos_btn")?.GetComponent<Button>();
-    if (rotationDecrementButton == null)
-      rotationDecrementButton = GameObject.Find("rot_neg_btn")?.GetComponent<Button>();
-    if (spawnCrossSectionButton == null)
-      spawnCrossSectionButton = GameObject.Find("slice_plane_btn")?.GetComponent<Button>();
-
-    // listeners to activate function on UI event handlers
+    // listener methods to activate on UI event handlers
     if (positionIncrementButton != null)
       positionIncrementButton.onClick.AddListener(OnPositionIncrementClicked);
     if (positionDecrementButton != null)
@@ -86,91 +70,65 @@ public class VolumeDataControlUI : NetworkBehaviour
       spawnCrossSectionButton.onClick.AddListener(OnSpawnCrossSectionButtonClicked);
   }
 
-  private IEnumerator FindVolumeObject()
+  private void OnDestroy()
+  {
+    // unsubscribe from OnVolumeSpawned event
+    if (volumeDataNetworker != null)
+      volumeDataNetworker.OnVolumeSpawned -= OnVolumeSpawned;
+  }
+
+  private void OnVolumeSpawned(int objectId)
+  {
+    // notified that VolumeObject has been spawned, can now start looking for it
+    StartCoroutine(WaitForVolumeObject(objectId));
+  }
+
+  private IEnumerator WaitForVolumeObject(int objectId)
   {
     int retryCount = 0;
-    const int maxRetries = 120; // searches for a full minute max
+    const int maxRetries = 60;
 
-    // find networked instance of the volumeRenderedObject prefab spawned in the scene by the networkmanager by using the Prefab's NetworkObject ID
-    while (volumeObject == null && retryCount < maxRetries) 
+    while (volumeObject == null && retryCount < maxRetries)
     {
-      if (volumeDataNetworker != null && volumeDataNetworker.volumeRenderedObjectPrefab != null)
+      // NetworkManager.ClientManager.Objects.Spawned from FishNet maps ObjectIDs to NetworkObjects that have been spawned and synced to the client
+      // TryGetValue tries to get the NetworkObject, if it succeeds then it assigns it to networkObject. (https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.dictionary-2.trygetvalue?view=net-9.0)
+      if (NetworkManager.ClientManager.Objects.Spawned.TryGetValue(objectId, out NetworkObject networkObject))
       {
-        NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
-        int expectedPrefabId = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId;
-        
-        NetworkObject targetNetObj = null;
-        foreach (NetworkObject nob in networkObjects) // find first prefab with ID that matched expected prefab ID
-        {
-          if (nob.PrefabId == expectedPrefabId)
-          {
-            targetNetObj = nob;
-            break;
-          }
-        }
-
-        if (targetNetObj != null)
-        {
-          volumeObject = targetNetObj.GetComponent<VolumeRenderedObject>();
-          if (volumeObject != null)
-          {
-            Debug.Log($"Found volumeObject (ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId})");
-          }
-          else
-          {
-            Debug.LogWarning($"NetworkObject found (ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId}) but missing VolumeRenderedObject component.");
-          }
-        }
-        else
-        {
-          Debug.Log($"Waiting for VolumeRenderedObject: Attempt {(retryCount+1).ToString()} out of {maxRetries}.");
-        }
-      }
-      else
-      {
-        Debug.LogWarning($"volumeDataNetworker or volumeRenderedObjectPrefab is null.");
+        volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
+        Debug.Log($"VolumeDataControlUI: Found VolumeRenderedObject (ObjectId={objectId})");
+        yield break;
       }
 
-      if (volumeObject == null)
-      {
-        retryCount++;
-        yield return new WaitForSeconds(0.5f);
-      }
-    }
-
-    if (volumeObject == null)
-    {
-      Debug.LogError($"Failed to find VolumeRenderedObject after {maxRetries} retries.");
+      retryCount++;
+      yield return new WaitForSeconds(0.5f);
     }
   }
 
   private void UpdateInteractableState()
   {
-    bool isOwner = IsOwner || IsServer; // IsOwner and IsServer provided directly by FishNet - indicates ownership
+    bool isPermitted = IsOwner || IsServer; // IsOwner and IsServer provided directly by FishNet - indicates ownership
     // allow or block anything who isnt owner of canvas from editing
     if (positionAxisDropdown != null)
-      positionAxisDropdown.interactable = isOwner;
+      positionAxisDropdown.interactable = isPermitted;
     if (positionIncrementButton != null)
-      positionIncrementButton.interactable = isOwner;
+      positionIncrementButton.interactable = isPermitted;
     if (positionDecrementButton != null)
-      positionDecrementButton.interactable = isOwner;
+      positionDecrementButton.interactable = isPermitted;
     if (rotationAxisDropdown != null)
-      rotationAxisDropdown.interactable = isOwner;
+      rotationAxisDropdown.interactable = isPermitted;
     if (rotationIncrementButton != null)
-      rotationIncrementButton.interactable = isOwner;
+      rotationIncrementButton.interactable = isPermitted;
     if (rotationDecrementButton != null)
-      rotationDecrementButton.interactable = isOwner;
+      rotationDecrementButton.interactable = isPermitted;
     if (scaleSlider != null)
-      scaleSlider.interactable = isOwner;
-
-    Debug.Log($"VolumeDataControlUI: Interactable={isOwner} for client {NetworkManager.ClientManager.Connection.ClientId}, IsOwner={IsOwner}, IsServer={IsServer}");
+      scaleSlider.interactable = isPermitted;
   }
 
   public override void OnOwnershipClient(NetworkConnection prevOwner) // callback function for when ownership of object changes
   {
     base.OnOwnershipClient(prevOwner); // ensure all default ownersip change functions are called
-    UpdateInteractableState();
-    if (IsOwner && volumeObject != null)
+    UpdateInteractableState(); // only new owner can interact
+    if (IsOwner && volumeObject != null) // should this not be !IsOwner??
     {
       NetworkObject volumeNetworkObject = volumeObject.GetComponent<NetworkObject>();
       if (volumeNetworkObject != null && volumeNetworkObject.Owner != Owner) // change in ownership
@@ -194,8 +152,9 @@ public class VolumeDataControlUI : NetworkBehaviour
       {
         pos = volumeObject.transform.position;
         rot = volumeObject.transform.rotation.eulerAngles;
-        scale = volumeObject.transform.localScale.x; // Uniform scaling
+        scale = volumeObject.transform.localScale.x; // uniform scaling
 
+        // normalize angles for printing to labels
         rot.x = NormalizeAngle(rot.x);
         rot.y = NormalizeAngle(rot.y);
         rot.z = NormalizeAngle(rot.z);
@@ -220,113 +179,97 @@ public class VolumeDataControlUI : NetworkBehaviour
       // update scale text
       if (scaleText != null)
         scaleText.text = $"Scale: {scale:F2}";
-      //if (scaleSlider != null && !scaleSlider.IsInteractable()) // might be overly restrictive TODO test
-      if (scaleSlider != null)
+      if (scaleSlider != null)  
         scaleSlider.value = scale;
 
+      // update labels every 100ms - a bit brute force
       yield return new WaitForSeconds(0.1f);
     }
   }
 
   private void OnPositionIncrementClicked()
   {
-    if (CanInteract() == false)
-    {
-      Debug.LogWarning("Cannot adjust position: Not the owner of the canvas.");
-      return;
-    }
+    // request ownership of canvas to edit
+    RequestCanvasOwnership();
 
-    if (volumeObject == null)
-    {
-      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
+    if (!CanInteract() || volumeObject == null)
       return;
-    }
 
     int axisIndex = 0; // default value
     if (positionAxisDropdown != null)
     {
       axisIndex = positionAxisDropdown.value; // set axisIndex to current axis selected by dropdown
     }
+    // get current position to modify
     Vector3 newPos = volumeObject.transform.position;
 
     switch (axisIndex)
     {
       case 0: // x axis
         newPos.x += positionIncrement;
-        newPos.x = (float)Math.Round(newPos.x, 1);
+        newPos.x = (float)Math.Round(newPos.x, 2);
         break;
       case 1: // y axis
         newPos.y += positionIncrement;
-        newPos.y = (float)Math.Round(newPos.y, 1);
+        newPos.y = (float)Math.Round(newPos.y, 2);
         break;
       case 2: // z axis
         newPos.z += positionIncrement;
-        newPos.z = (float)Math.Round(newPos.z, 1);
+        newPos.z = (float)Math.Round(newPos.z, 2);
         break;
     }
 
     //volumeObject.transform.position = newPos;
-    //Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+    Debug.Log($"Set volumetric data position to {newPos}.");
 
     SetPositionServerRpc(newPos);
   }
 
   private void OnPositionDecrementClicked()
   {
-    if (CanInteract() == false)
-    {
-      Debug.LogWarning("Cannot adjust position: Not the owner of the canvas.");
-      return;
-    }
+    // request ownership of canvas to edit
+    RequestCanvasOwnership();
 
-    if (volumeObject == null)
-    {
-      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
+    if (!CanInteract() || volumeObject == null)
       return;
-    }
 
     int axisIndex = 0;
     if (positionAxisDropdown != null)
     {
       axisIndex = positionAxisDropdown.value; // set axisIndex to current axis selected by dropdown
     }
+    // get current position to modify
     Vector3 newPos = volumeObject.transform.position;
 
     switch (axisIndex)
     {
       case 0: // x axis
         newPos.x -= positionIncrement;
-        newPos.x = (float)Math.Round(newPos.x, 1);
+        newPos.x = (float)Math.Round(newPos.x, 2);
         break;
       case 1: // y axis
         newPos.y -= positionIncrement;
-        newPos.y = (float)Math.Round(newPos.y, 1);
+        newPos.y = (float)Math.Round(newPos.y, 2);
         break;
       case 2: // z axis
         newPos.z -= positionIncrement;
-        newPos.z = (float)Math.Round(newPos.z, 1);
+        newPos.z = (float)Math.Round(newPos.z, 2);
         break;
     }
 
     //volumeObject.transform.position = newPos;
-    //Debug.Log($"Set position to {newPos} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+    Debug.Log($"Set volumetric data position to {newPos}.");
 
     SetPositionServerRpc(newPos);
   }
 
   private void OnRotationIncrementClicked()
   {
-    if (!CanInteract())
-    {
-      Debug.LogWarning("Cannot adjust rotation: Not the owner of the canvas.");
-      return;
-    }
+    // request ownership of canvas to edit
+    RequestCanvasOwnership();
 
-    if (volumeObject == null)
-    {
-      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
+    if (!CanInteract() || volumeObject == null)
       return;
-    }
 
     int axisIndex = 0;
     if (rotationAxisDropdown != null)
@@ -359,24 +302,18 @@ public class VolumeDataControlUI : NetworkBehaviour
     euler.x = NormalizeAngle(euler.x);
     euler.y = NormalizeAngle(euler.y);
     euler.z = NormalizeAngle(euler.z);
-    Debug.Log($"Set rotation to Euler={euler}, Quaternion={newRot} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+    Debug.Log($"Set volumetric data rotation to Euler={euler}.");
 
     SetRotationServerRpc(newRot); // sync rotation to all clients
   }
 
   private void OnRotationDecrementClicked()
   {
-    if (!CanInteract())
-    {
-      Debug.LogWarning("Cannot adjust rotation: Not the owner of the canvas.");
-      return;
-    }
+    // request ownership of canvas to edit
+    RequestCanvasOwnership();
 
-    if (volumeObject == null)
-    {
-      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
+    if (!CanInteract() || volumeObject == null)
       return;
-    }
 
     int axisIndex = 0;
     if (rotationAxisDropdown != null)
@@ -409,56 +346,44 @@ public class VolumeDataControlUI : NetworkBehaviour
     euler.x = NormalizeAngle(euler.x);
     euler.y = NormalizeAngle(euler.y);
     euler.z = NormalizeAngle(euler.z);
-    Debug.Log($"Set rotation to Euler={euler}, Quaternion={newRot} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+    Debug.Log($"Set volumetric data rotation to Euler={euler}.");
 
     SetRotationServerRpc(newRot);
   }
 
   private void OnScaleSliderChanged(float value)
   {
-    if (!CanInteract())
-    {
-      Debug.LogWarning("Cannot adjust scale: Not the owner of the canvas.");
-      return;
-    }
+    // request ownership of canvas to edit
+    RequestCanvasOwnership();
 
-    if (volumeObject == null)
-    {
-      Debug.LogError("VolumeRenderedObject not assigned in VolumeDataControlUI.");
+    if (!CanInteract() || volumeObject == null)
       return;
-    }
 
-    Vector3 newScale = new Vector3(value, value, value); // Uniform scaling
+    Vector3 newScale = new Vector3(value, value, value); // uniform scaling
     //volumeObject.transform.localScale = newScale;
-    Debug.Log($"Set scale to {value} on volume (ObjectId={volumeObject.GetComponent<NetworkObject>().ObjectId}).");
+    Debug.Log($"Set volumetric data scale to {newScale}.");
 
     SetScaleServerRpc(value);
   }
 
   private void OnSpawnCrossSectionButtonClicked()
   {
-    if (spawnCrossSectionButton != null)
-    {
-      spawnCrossSectionButton.interactable = false; // disable to prevent double click spawning
-      Invoke(nameof(ReenableSpawnButton), 1f); // reenable after 1 second
-    }
-    var crossSectionManager = FindObjectOfType<CrossSectionManager>();
-    if (crossSectionManager == null)
-    {
-      Debug.LogError("Error: Could not find Cross Section Manager Component.");
+    if (volumeObject == null)
       return;
-    }
-    
-    Vector3 spawnPosition = new Vector3(2f, 1.5f, 2f);
+
+    Debug.Log("Requested spawn of CrossSectionPlane.");
+    // request ownership of canvas to edit
+    RequestCanvasOwnership();
+
+    if (spawnCrossSectionButton != null)
+      spawnCrossSectionButton.interactable = false; // disable to prevent double-click spawning
+
+    var crossSectionManager = FindObjectOfType<CrossSectionManager>();
+    // default spawn for cross section
+    Vector3 spawnPosition = new Vector3(0f, 1.5f, 0f);
     Quaternion spawnRotation = Quaternion.Euler(0f, 0f, 0f);
 
     crossSectionManager.SpawnCrossSectionPlaneServerRpc(spawnPosition, spawnRotation, NetworkManager.ClientManager.Connection);
-    Debug.Log("Requested spawn of CrossSectionPlane.");
-  }
-
-  private void ReenableSpawnButton()
-  {
-    spawnCrossSectionButton.interactable = true;
   }
 
   [ServerRpc(RequireOwnership = false)]
@@ -513,6 +438,30 @@ public class VolumeDataControlUI : NetworkBehaviour
       euler.y = NormalizeAngle(euler.y);
       euler.z = NormalizeAngle(euler.z);
       Debug.Log($"Client {NetworkManager.ClientManager.Connection.ClientId} updated rotation to Euler={euler}, Quaternion={newRot}.");
+    }
+  }
+
+  private void RequestCanvasOwnership()
+  {
+    OwnershipManager ownershipManager = GetComponent<OwnershipManager>();
+    if (ownershipManager == null)
+      return;
+
+    if (!IsOwner)
+    {
+      NetworkConnection localConnection = NetworkManager.ClientManager.Connection;
+      RequestCanvasOwnershipServerRpc(localConnection.ClientId);
+    }
+  }
+
+  [ServerRpc(RequireOwnership = false)]
+  private void RequestCanvasOwnershipServerRpc(int clientId)
+  {
+    NetworkConnection requester = ServerManager.Clients[clientId];
+    if (requester != null && NetworkObject.Owner != requester)
+    {
+      NetworkObject.GiveOwnership(requester);
+      Debug.Log($"Canvas ownership transferred to client {clientId}");
     }
   }
 

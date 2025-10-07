@@ -15,15 +15,10 @@ using System.Collections.Generic;
 using System.Collections;
 using VolumeData;
 
-/// <summary>
-/// Manages the networking of a volumetric dataset by spawning a VolumeRenderedObject on the server.
-/// Clients receive the dataset from the host via serialization, without needing local files. Ensures synchronised position/rotation/scale.
-/// </summary>
 public class VolumeDataNetworker : NetworkBehaviour
 {
   // private to other scripts but editable in inspector
   [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host -- path to folder(DICOM, image sequence)/file(Image, Raw, etc.) containing data
-  // default position and rotation for volumetric data doesnt seem like it has much effect though
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
   [SerializeField] public GameObject volumeRenderedObjectPrefab; // Public for VolumeDataControlUI
@@ -33,15 +28,18 @@ public class VolumeDataNetworker : NetworkBehaviour
   private GameObject canvasObject;
   private bool isVolumeSpawned;
   private bool isCanvasSpawned;
-  private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>(); // map networkconnections to chunked data
+  // Stores serialized dataset chunks for each client’s NetworkConnection + used to transmit data to clients joining later.
+  private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>(); 
   private byte[][] dataChunks; // Stored chunks for late-joining clients
   private DataSetLoader datasetLoader;
+
+  public event Action<int> OnVolumeSpawned;
 
   private void Start()
   {
     if (IsServer)
     {
-      ServerManager.OnServerConnectionState += OnServerConnectionState; // subscribe OnServerConnectionState to trigger when server starts/stops
+      ServerManager.OnRemoteConnectionState += OnRemoteConnectionState; // subscribe OnRemoteConnectionState to trigger when client joins/leaves - FishNet
       if (!isVolumeSpawned)
       {
         StartCoroutine(NetworkVolumeObject());
@@ -49,35 +47,19 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  private void OnServerConnectionState(ServerConnectionStateArgs args)
+  private void OnRemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
   {
-    if (args.ConnectionState == LocalConnectionState.Started)
+    if (args.ConnectionState == RemoteConnectionState.Started)
     {
-      // Find most recently connected client
-      NetworkConnection conn = null;
-      int highestClientId = -1;
-      foreach (NetworkConnection client in ServerManager.Clients.Values)
+      Debug.Log($"Client {conn.ClientId} connected.");
+      if (dataChunks != null && dataChunks.Length > 0)
       {
-        if (client.ClientId > highestClientId)
-        {
-          conn = client;
-          highestClientId = client.ClientId;
-        }
+        StartCoroutine(SendDatasetToClient(conn, dataChunks));
       }
-
-      if (conn != null)
-      {
-        Debug.Log($"Client {conn.ClientId} connected.");
-        if (dataChunks != null && dataChunks.Length > 0)
-        {
-          Debug.Log($"Sending dataset to Client {conn.ClientId}");
-          StartCoroutine(SendDatasetToClient(conn, dataChunks));
-        }
-        else
-        {
-          Debug.LogWarning($"No data available to send to Client {conn.ClientId}.");
-        }
-      }
+    }
+    if (args.ConnectionState == RemoteConnectionState.Stopped)
+    {
+      chunkStorage.Remove(conn); // remove connection's stored chunks after they disconnect
     }
   }
 
@@ -102,76 +84,65 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private IEnumerator NetworkVolumeObject(Vector3? position = null, Quaternion? rotation = null)
   {
-    if (isVolumeSpawned) // volume already spawned on server
-    {
+    if (isVolumeSpawned)
       yield break;
-    }
-    // despawn existing VolumeRenderedObjects - dont want multiple data instances in single scene
-    // for when runtime dataloading functionality implemented
-    foreach (var existingObj in FindObjectsOfType<VolumeRenderedObject>())
-    {
-      if (existingObj.gameObject != gameObject)
-      {
-        Debug.Log($"Removing existing VolumeRenderedObject: {existingObj.gameObject.name}");
-        ServerManager.Despawn(existingObj.gameObject);
-      }
-    }
 
-    datasetLoader = new DataSetLoader(datasetPath); // create new datasetloader
-    VolumeDataset dataset = datasetLoader.LoadDataset(); // load data in
-    if (dataset == null)
-    {
-      yield break;
-    }
-    // serialize data for transmission
-    byte[] serializedData = DatasetSerializer.Serialize(dataset);
-    // compress serialized data for transmission
-    dataChunks = DatasetSerializer.ChunkData(serializedData);
-    Debug.Log($"Server ready to send data to clients.");
+    // create new datasetLoader, load data in and prep for transmission
+    datasetLoader = new DataSetLoader(datasetPath);
+    VolumeDataset dataset = datasetLoader.LoadDataset();
+    dataChunks = PrepareDataForTransmit(datasetPath, dataset);
+    Debug.Log($"Volumetric data ready for transmission.");
+
     // instantiate and configure VolumeRenderedObject
     GameObject volumeGameObject = Instantiate(volumeRenderedObjectPrefab);
     volumeObject = volumeGameObject.GetComponent<VolumeRenderedObject>();
     if (volumeObject == null)
-    {
       volumeObject = volumeGameObject.AddComponent<VolumeRenderedObject>();
-    }
+
     NetworkObject networkObject = volumeGameObject.GetComponent<NetworkObject>();
     yield return datasetLoader.ConfigureVolumeRenderingAsync(volumeObject, dataset);
+
     // spawn VolumeRenderedObject in the scene
     ServerManager.Spawn(volumeGameObject);
     isVolumeSpawned = true;
     Debug.Log($"Server spawned VolumeRenderedObject (ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}, Dataset={datasetPath})");
-    // send dataset to connected clients
-    if (ServerManager.Clients.Count > 0)
-    {
-      foreach (NetworkConnection clientConn in ServerManager.Clients.Values)
-      {
-        Debug.Log($"Starting transmission to client {clientConn.ClientId}");
-        StartCoroutine(SendDatasetToClient(clientConn, dataChunks));
-      }
-    }
+    NotifyObserversVolumeSpawned(networkObject.ObjectId);
 
     yield return new WaitForSeconds(0.1f);
     // spawn canvas to control data params/analysis tools
-    if (!isCanvasSpawned)
+    SpawnDataMenu();
+  }
+
+  private byte[][] PrepareDataForTransmit(string datasetPath, VolumeDataset dataset)
+  {
+    // serialize + compress data for transmission
+    byte[] serializedData = DatasetSerializer.Serialize(dataset);
+    return DatasetSerializer.ChunkData(serializedData);
+  }
+
+  private void SpawnDataMenu()
+  {
+    if (!isCanvasSpawned) // make sure canvas is only spawned once
     {
-      canvasObject = Instantiate(volumeControlCanvasPrefab, new Vector3(0f, 1.5f, 3.2f), Quaternion.Euler(0f, 0f, 0f)); // instantiate new canvas instance and place at default position
+      // instantiate new canvas instance and place at default position
+      canvasObject = Instantiate(volumeControlCanvasPrefab, new Vector3(0f, 1.5f, 3.2f), Quaternion.Euler(0f, 0f, 0f)); 
       NetworkObject canvasNetworkObject = canvasObject.GetComponent<NetworkObject>();
       VolumeDataControlUI controlUI = canvasObject.GetComponent<VolumeDataControlUI>();
-      controlUI.SetVolumeDataNetworker(this); // assign VolumeDataNetworker at runtime
-      ServerManager.Spawn(canvasObject); // spawn canvas
+      // assign VolumeDataNetworker at runtime
+      controlUI.SetVolumeDataNetworker(this);
+      // spawn canvas
+      ServerManager.Spawn(canvasObject);
       isCanvasSpawned = true;
-      Debug.Log($"Server spawned VolumeControlCanvas, ObjectId={canvasNetworkObject.ObjectId}, PrefabId={canvasNetworkObject.PrefabId}");
+      Debug.Log($"Server spawned VolumeControlCanvas, ObjectId={canvasNetworkObject.ObjectId}, PrefabId={canvasNetworkObject.PrefabId}.");
     }
   }
 
   private IEnumerator SendDatasetToClient(NetworkConnection conn, byte[][] dataChunks)
   {
-    if (dataChunks == null || dataChunks.Length == 0) // no chunks to send to client
-    {
-      yield break;
-    }
+    if (dataChunks == null || dataChunks.Length == 0) 
+      yield break;// no chunks to send to client
 
+    // loop through all chunks and send to client
     for (int i = 0; i < dataChunks.Length; i++)
     {
       if (dataChunks[i] == null || dataChunks[i].Length == 0)
@@ -181,11 +152,12 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
       Debug.Log($"Sending chunk {(i+1).ToString()}/{dataChunks.Length}, size={dataChunks[i].Length} bytes to client {conn.ClientId}");
       TargetSendDatasetChunk(conn, i, dataChunks.Length, dataChunks[i]);
-      yield return new WaitForSeconds(0.1f);
+      // send next chunk after small wait
+      yield return new WaitForSeconds(0.1f); 
     }
   }
 
-  [TargetRpc]
+  [TargetRpc] // RPC used to run logic on a specific target client - conn is the client to target/connection the data is going to
   private void TargetSendDatasetChunk(NetworkConnection conn, int chunkIndex, int totalChunks, byte[] chunk)
   {
     if (!IsServer)
@@ -196,15 +168,18 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private IEnumerator ReceiveDatasetChunk(int chunkIndex, int totalChunks, byte[] chunk)
   {
-    if (!chunkStorage.ContainsKey(NetworkManager.ClientManager.Connection)) // does networkconnectione exist as a key? No? then init new chunkarray to store chunks for that client
+    NetworkConnection clientConnection = NetworkManager.ClientManager.Connection;
+    // if the client networkconnection does not already exist as a key in the chunkstorage dictionary, make a new space for it.
+    if (!chunkStorage.ContainsKey(clientConnection))
     {
-      chunkStorage[NetworkManager.ClientManager.Connection] = new byte[totalChunks][];
+      chunkStorage[clientConnection] = new byte[totalChunks][];
     }
-    chunkStorage[NetworkManager.ClientManager.Connection][chunkIndex] = chunk;
+    chunkStorage[clientConnection][chunkIndex] = chunk;
     Debug.Log($"Client received chunk {chunkIndex + 1}/{totalChunks}, size={chunk.Length} bytes");
 
     // get all chunks for the current client
-    byte[][] clientChunks = chunkStorage[NetworkManager.ClientManager.Connection];
+    byte[][] clientChunks = chunkStorage[clientConnection];
+
     // check if all chunks have been received
     bool allChunksReceived = true;
     foreach (var clientChunk in clientChunks)
@@ -216,11 +191,12 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
     }
 
+    // only uncompress and deserialize chunks when the full dataset has been received by client
     if (allChunksReceived)
     {
-      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[NetworkManager.ClientManager.Connection]); // uncompress data
+      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[clientConnection]); // uncompress data
       VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData); // deserialize back into original form before transmission
-      chunkStorage.Remove(NetworkManager.ClientManager.Connection);
+      chunkStorage.Remove(clientConnection);
 
       if (dataset == null)
       {
@@ -240,62 +216,55 @@ public class VolumeDataNetworker : NetworkBehaviour
 
     if (!IsServer)
     {
-      int retryCount = 0;
-      const int maxRetries = 60;
-      while (networkObject == null && retryCount < maxRetries)
+      int expectedPrefabId = volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId; // get expected ID of VolumeRenderedObject in scene from prefab
+      // pause execution until network object with the expected ID has been found before going on with dataset assignment
+      // makes sure dataset/VolumeRenderedObject component is added to correct networked object
+      yield return WaitForNetworkObject(expectedPrefabId, nob =>
       {
-        NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
-        int expectedPrefabId = volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId; // get expected ID of VolumeRenderedObject in scene from prefab
-        
-        NetworkObject foundNetworkObject = null;
-        foreach (NetworkObject nob in networkObjects) // find spawned VolumeRenderedObject in list of spawned NetworkObjects
-        {
-          if (nob.PrefabId == expectedPrefabId)
-          {
-            foundNetworkObject = nob;
-            break;
-          }
-        }
-
-        if (foundNetworkObject == null)
-        {
-          Debug.Log($"Client waiting for networked VolumeRenderedObject: Attempt {(retryCount+1).ToString()}/{maxRetries}. Expected PrefabId={expectedPrefabId}");
-          retryCount++;
-          yield return new WaitForSeconds(0.5f);
-        }
-        else
-        {
-          networkObject = foundNetworkObject;
-          volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
-          if (volumeObject == null)
-          {
-            volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
-          }
-          Debug.Log($"Client found NetworkObject, ObjectId={networkObject.ObjectId}, PrefabId={networkObject.PrefabId}");
-        }
-      }
+        // callback - once the needed network object has been found, assign it and use to add VolumeRenderedObject component to that networked object
+        networkObject = nob;
+        volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
+        if (volumeObject == null)
+          volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
+      });
       if (networkObject == null || volumeObject == null)
-      {
-        Debug.LogError($"Client failed to find VolumeRenderedObject after {maxRetries} retries.");
         yield break;
-      }
     }
     else
     {
       if (volumeObject == null)
       {
-        Debug.LogError("Server: VolumeRenderedObject not set.");
         yield break;
       }
-      networkObject = volumeObject.GetComponent<NetworkObject>();
-      Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
+      //networkObject = volumeObject.GetComponent<NetworkObject>();
+      //Transform volumeContainer = networkObject.transform.Find("VolumeContainer");
     }
-
-    datasetLoader = new DataSetLoader(); // create new datasetloader
+    // create new datasetloader and configure rendering
+    datasetLoader = new DataSetLoader(); 
     yield return datasetLoader.ConfigureVolumeRenderingAsync(volumeObject, dataset);
     // set to default positions if rotation or position is null
     volumeObject.transform.position = position ?? defaultPosition; 
     volumeObject.transform.rotation = rotation ?? defaultRotation;
+  }
+
+  private IEnumerator WaitForNetworkObject(int expectedPrefabId, Action<NetworkObject> onFound)
+  {
+    // search for NetworkObject using the expected ID obtained from the volumetric data prefab for a max of 30 seconds
+    int retryCount = 0;
+    const int maxRetries = 60;
+    while (retryCount < maxRetries)
+    {
+      NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>(); // find all objects active in scene that has a NetworkObject component
+      NetworkObject found = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId);
+      if (found != null)
+      {
+        // NetworkObject that we are looking for is found, trigger the onFound callback function that assigns VolumeRenderedObject component
+        onFound(found);
+        yield break;
+      }
+      retryCount++;
+      yield return new WaitForSeconds(0.5f);
+    }
   }
 
   [ServerRpc(RequireOwnership = false)]
@@ -303,34 +272,66 @@ public class VolumeDataNetworker : NetworkBehaviour
   {
     if (isVolumeSpawned && volumeObject != null)
     {
+      Debug.Log($"Sending dataset to client {conn.ClientId}.");
       NetworkObject networkObject = volumeObject.GetComponent<NetworkObject>();
-      if (networkObject != null)
+      if (dataChunks != null && dataChunks.Length > 0)
       {
+        StartCoroutine(SendDatasetToClient(conn, dataChunks));
+      }
+      else
+      {
+        // no data available, have to prep it for transmission
+        byte[] serializedData = DatasetSerializer.Serialize(volumeObject.dataset);
+        dataChunks = DatasetSerializer.ChunkData(serializedData);
         if (dataChunks != null && dataChunks.Length > 0)
         {
           StartCoroutine(SendDatasetToClient(conn, dataChunks));
-          Debug.Log($"Server: Sending dataset to client {conn.ClientId}, ObjectId={networkObject.ObjectId}, Chunks={dataChunks.Length}");
-        }
-        else
-        {
-          Debug.LogError($"Server: No dataset chunks available for client {conn.ClientId}. Re-serializing dataset.");
-          byte[] serializedData = DatasetSerializer.Serialize(volumeObject.dataset);
-          if (serializedData != null)
-          {
-            dataChunks = DatasetSerializer.ChunkData(serializedData);
-            if (dataChunks != null && dataChunks.Length > 0)
-            {
-              StartCoroutine(SendDatasetToClient(conn, dataChunks));
-              Debug.Log($"Server: Re-serialized and sending dataset to client {conn.ClientId}, ObjectId={networkObject.ObjectId}, Chunks={dataChunks.Length}");
-            }
-          }
         }
       }
     }
     else
     {
-      Debug.Log($"Server: No volume spawned yet for client {conn.ClientId}. Spawning new volume.");
+      Debug.Log($"No volume spawned yet for client {conn.ClientId}, spawning new volume.");
       StartCoroutine(NetworkVolumeObject());
     }
+  }
+
+  [ObserversRpc]
+  private void NotifyObserversVolumeSpawned(int objectId)
+  {
+    StartCoroutine(HandleVolumeSpawned(objectId));
+  }
+
+  private IEnumerator HandleVolumeSpawned(int objectId)
+  {
+    if (IsServer && volumeObject != null)
+    {
+      // server immediately lets clients know when the volumedata exists when spawned
+      OnVolumeSpawned?.Invoke(objectId);
+      yield break;
+    }
+
+    // for clients, wait for NetworkObject to be registered - retry loop to wait for FishNet to register the NetworkObject locally
+    int retryCount = 0;
+    const int maxRetries = 60;
+
+    while (retryCount < maxRetries)
+    {
+      // NetworkManager.ClientManager.Objects.Spawned from FishNet maps ObjectIDs to NetworkObjects that have been spawned and synced to the client
+      // TryGetValue tries to get the NetworkObject, if it succeeds then it assigns it to networkObject. (https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.dictionary-2.trygetvalue?view=net-9.0)
+      if (NetworkManager.ClientManager.Objects.Spawned.TryGetValue(objectId, out NetworkObject networkObject))
+      {
+        volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
+        if (volumeObject == null)
+          volumeObject = networkObject.gameObject.AddComponent<VolumeRenderedObject>();
+        // notify all subscribers' VolumeDataControlUI that the volume has been spawned to stop them from searching for it before it has been spawned and timing out early
+        OnVolumeSpawned?.Invoke(objectId);
+        yield break;
+      }
+
+      retryCount++;
+      yield return new WaitForSeconds(0.5f);
+    }
+    Debug.LogError($"Failed to find VolumeRenderedObject with ObjectId={objectId}");
   }
 }

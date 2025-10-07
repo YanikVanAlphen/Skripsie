@@ -10,15 +10,8 @@ public class CrossSectionPlaneConfig : NetworkBehaviour
 
   public override void OnStartClient()
   {
-    base.OnStartClient();
-
+    base.OnStartClient(); // ensure default client inits are completed
     planeComponent = GetComponent<CrossSectionPlane>();
-    if (planeComponent == null)
-    {
-      Debug.LogError($"CrossSectionPlaneConfig: Missing CrossSectionPlane on {gameObject.name}");
-      return;
-    }
-
     StartCoroutine(ConfigureLocalTarget());
   }
 
@@ -43,7 +36,6 @@ public class CrossSectionPlaneConfig : NetworkBehaviour
 
       if (volumeObject.dataset == null)
       {
-        Debug.Log($"CrossSectionPlaneConfig: VolumeRenderedObject found but dataset not ready, waiting...");
         yield return new WaitForSeconds(0.5f);
       }
     }
@@ -53,10 +45,9 @@ public class CrossSectionPlaneConfig : NetworkBehaviour
     if (crossSectionManager == null)
     {
       crossSectionManager = volumeObject.gameObject.AddComponent<UnityVolumeRendering.CrossSectionManager>();
-      Debug.Log($"CrossSectionPlaneConfig: Initialized CrossSectionManager on {volumeObject.gameObject.name}");
     }
 
-    // set target locally
+    // set target for cross section locally
     planeComponent.SetTargetObject(volumeObject);
     Debug.Log($"CrossSectionPlaneConfig: Client configured CrossSectionPlane ({gameObject.name}) with target {volumeObject.gameObject.name}");
   }

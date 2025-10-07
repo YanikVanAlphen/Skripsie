@@ -17,8 +17,8 @@ public class ConnectionSetup : MonoBehaviour
   // private to other classes while still being editable in Unity Inspector
   [SerializeField] private NetworkManager networkManager;
   [SerializeField] private GameObject ipInputFieldObject;
-  [SerializeField] private string hostIP = "10.255.10.54";
-  [SerializeField] private ushort portNumber = 7770;
+  [SerializeField] private string hostIP = "10.255.10.54"; // default host IP address
+  [SerializeField] private ushort portNumber = 7770; // default FishNet port for comms
 
   public Canvas mainMenuCanvas;
   private const string VOICE_ROOM_NAME = "<DEFAULT>";
@@ -77,13 +77,18 @@ public class ConnectionSetup : MonoBehaviour
 
   private IEnumerator JoinVoiceRoomDelayed()
   {
-    while (!InstanceFinder.ServerManager.Started && !chatroomCreated)
-      yield return new WaitForSeconds(0.1f); // Wait for server
+    // Wait for server to start and client to have a valid ClientId
+    bool isServerStarted = InstanceFinder.ServerManager.Started;
+    int clientId = InstanceFinder.ClientManager.Connection.ClientId;
+    while (!isServerStarted || clientId < 0) // [-1] is invalid Id
+    {
+      yield return new WaitForSeconds(0.1f);
+    }
 
     VoiceNetwork voiceNetwork = VoiceNetwork.instance;
     try
     {
-      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME); // TODO resolve error in joining with ownID
+      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
       Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
     }
     catch (Exception e)
@@ -97,8 +102,9 @@ public class ConnectionSetup : MonoBehaviour
     Debug.Log($"Remote client {conn.ClientId} state: {args.ConnectionState}");
   }
 
-  private void OnDestroy() // unsubscribe for cleanup
+  private void OnDestroy()
   {
+    // unsubscribe from all events for cleanup
     if (InstanceFinder.ClientManager != null)
       InstanceFinder.ClientManager.OnClientConnectionState -= ClientConnectionState;
     if (InstanceFinder.ServerManager != null)
@@ -108,10 +114,11 @@ public class ConnectionSetup : MonoBehaviour
     }
   }
 
-  public void StartHost()
+  public void StartHost() // Host = server + client instance
   {
+    // set transport
     var tugboat = (Tugboat)networkManager.TransportManager.Transport;
-    tugboat.SetClientAddress("127.0.0.1"); // Host client connects to itself
+    tugboat.SetClientAddress("127.0.0.1"); // Host-client connects to itself
     tugboat.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4); // config server to accept connections from any IP
     tugboat.SetPort(portNumber);
     Debug.Log($"Starting Host on {hostIP}:{portNumber}");
@@ -136,9 +143,8 @@ public class ConnectionSetup : MonoBehaviour
   public void SetIPAddress(GameObject ipInputFieldObject)
   {
     if (networkManager == null)
-    {
       return;
-    }
+    // set transport
     var tugboat = (Tugboat)networkManager.TransportManager.Transport;
     if (ipInputFieldObject != null)
     {
@@ -167,25 +173,6 @@ public class ConnectionSetup : MonoBehaviour
     {
       //mainMenuCanvas.gameObject.SetActive(false);
       mainMenuCanvas.enabled = false; // only disable visual instead of whole menu canvas
-    }
-  }
-
-  /// <summary>
-  /// Obtained from Unity Forums https://discussions.unity.com/t/get-the-device-ip-address-from-unity/235351/2. Only returns first IP from the list.
-  /// </summary>
-  /// <returns></returns>
-  private string GetLocalIPv4()
-  {
-    try
-    {
-      return Dns.GetHostEntry(Dns.GetHostName()).AddressList
-          .First(f => f.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-          .ToString();
-    }
-    catch (System.Exception ex)
-    {
-      Debug.LogError($"Failed to get local IPv4: {ex.Message}");
-      return "127.0.0.1";
     }
   }
 }

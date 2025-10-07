@@ -168,33 +168,7 @@ namespace VolumeData
       volumeObject.transform.localScale = Vector3.one / maxScale; // normalise the scaling + uniform scaling in all axes
 
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer"); // access VolumeContainer child of VolumeRenderedObject to explicitly set rendering params
-      MeshRenderer meshRenderer = null;
-      if (volumeContainer == null)
-      {
-        Debug.LogWarning("VolumeContainer child not found");
-        // is this necessary to check?
-        //GameObject container = new GameObject("VolumeContainer");
-        //container.transform.SetParent(volumeObject.transform, false);
-        //container.transform.localPosition = Vector3.zero;
-        //container.transform.localRotation = Quaternion.identity;
-        //container.transform.localScale = Vector3.one;
-
-        //MeshFilter meshFilter = container.AddComponent<MeshFilter>();
-        //meshFilter.mesh = GameObject.CreatePrimitive(PrimitiveType.Cube).GetComponent<MeshFilter>().sharedMesh;
-        //GameObject.Destroy(GameObject.Find("Cube")); // Clean up temp cube
-
-        //meshRenderer = container.AddComponent<MeshRenderer>();
-        //volumeContainer = container.transform;
-      }
-      else
-      {
-        meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
-        if (meshRenderer == null)
-        {
-          meshRenderer = volumeContainer.gameObject.AddComponent<MeshRenderer>();
-        }
-      }
-
+      MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
       Shader volumeShader = Shader.Find(DVRShaderName);
       if (volumeShader == null)
       {
@@ -266,6 +240,7 @@ namespace VolumeData
       volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
       volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
       volumeObject.UpdateMaterialProperties();
+      volumeObject.SetLightingEnabled(true);
     }
 
     private Texture2D GenerateNoiseTexture()

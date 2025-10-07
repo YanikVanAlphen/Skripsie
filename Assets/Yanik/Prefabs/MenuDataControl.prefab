@@ -4374,6 +4374,7 @@ GameObject:
   - component: {fileID: 2134901569356180814}
   - component: {fileID: 2523150741379064304}
   - component: {fileID: 6310017634735129508}
+  - component: {fileID: 3397649054201545233}
   m_Layer: 5
   m_Name: MenuDataControl
   m_TagString: Untagged
@@ -4415,6 +4416,7 @@ MonoBehaviour:
   - {fileID: 664930613836434806}
   - {fileID: 2134901569356180814}
   - {fileID: 2523150741379064304}
+  - {fileID: 6310017634735129508}
   <ParentNetworkObject>k__BackingField: {fileID: 0}
   <ChildNetworkObjects>k__BackingField: []
   _isNetworked: 1
@@ -4513,9 +4515,51 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2aaecc057afee174d8db587928f20f0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _componentIndexCache: 3
+  _addedNetworkObject: {fileID: 4344840452321603846}
+  _networkObjectCache: {fileID: 4344840452321603846}
+--- !u!114 &3397649054201545233
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7200251300199759454}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   _componentIndexCache: 255
   _addedNetworkObject: {fileID: 4344840452321603846}
   _networkObjectCache: {fileID: 0}
+  _synchronizeParent: 0
+  _packing:
+    Position: 1
+    Rotation: 1
+    Scale: 0
+  _interpolation: 2
+  _extrapolation: 2
+  _enableTeleport: 0
+  _teleportThreshold: 1
+  _clientAuthoritative: 1
+  _sendToOwner: 1
+  _interval: 1
+  _synchronizePosition: 1
+  _positionSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeRotation: 1
+  _rotationSnapping:
+    X: 0
+    Y: 0
+    Z: 0
+  _synchronizeScale: 1
+  _scaleSnapping:
+    X: 0
+    Y: 0
+    Z: 0
 --- !u!1 &7251782805579967996
 GameObject:
   m_ObjectHideFlags: 0

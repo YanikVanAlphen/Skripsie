@@ -99,13 +99,6 @@ public static class DatasetSerializer
       using (MemoryStream stream = new MemoryStream(decompressedData))
       using (BinaryReader reader = new BinaryReader(stream)) // reads data in sequence
       {
-        //VolumeDataset dataset = new VolumeDataset
-        //{
-        //  dimX = reader.ReadInt32(),
-        //  dimY = reader.ReadInt32(),
-        //  dimZ = reader.ReadInt32(),
-        //  scale = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle())
-        //};
         VolumeDataset dataset = ScriptableObject.CreateInstance<VolumeDataset>(); // properly inits the volume data as a scriptableObject to avoid console warning
         dataset.dimX = reader.ReadInt32();
         dataset.dimY = reader.ReadInt32();

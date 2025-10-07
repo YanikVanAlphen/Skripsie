@@ -5,8 +5,8 @@ using System.Collections;
 
 public class CrossSectionSync : NetworkBehaviour
 {
-  private CrossSectionPlane crossSectionPlane;
   [SerializeField] private VolumeRenderedObject volumeObject;
+  private CrossSectionPlane crossSectionPlane;
   private Vector3 lastVolumeScale; // last known volumerenderobject scale
 
   private void Awake()
@@ -80,11 +80,8 @@ public class CrossSectionSync : NetworkBehaviour
   private void UpdatePlaneScale()
   {
     if (volumeObject == null)
-    {
-      Debug.LogWarning("Cannot update plane scale: VolumeRenderedObject is not set.");
       return;
-    }
-
+    // scale cross section to be 1.5 times the size of volumetric data
     transform.localScale = volumeObject.transform.localScale * 1.5f;
     Debug.Log($"Updated CrossSectionPlane scale to match VolumeRenderedObject: Scale={transform.localScale}");
   }
@@ -100,7 +97,7 @@ public class CrossSectionSync : NetworkBehaviour
       transform.localScale = scale;
       // let clients know to update their copies
       RpcUpdatePlaneTransform(position, rotation, scale);
-      Debug.Log($"Server updated CrossSectionPlane transform: Position={position}, Rotation={rotation}, Scale={scale}");
+      Debug.Log($"Server updated CrossSectionPlane: Position={position}, Rotation={rotation}, Scale={scale}");
     }
   }
 
@@ -112,7 +109,7 @@ public class CrossSectionSync : NetworkBehaviour
       transform.position = position;
       transform.rotation = rotation;
       transform.localScale = scale;
-      Debug.Log($"Client updated CrossSectionPlane transform: Position={position}, Rotation={rotation}, Scale={scale}");
+      Debug.Log($"Client updated CrossSectionPlane: Position={position}, Rotation={rotation}, Scale={scale}");
     }
   }
 

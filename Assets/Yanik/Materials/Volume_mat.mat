@@ -26,6 +26,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - CROSS_SECTION_ON
+  - LIGHTING_ON
   - MODE_DVR
   - RAY_TERMINATE_ON
   m_InvalidKeywords: []
@@ -134,8 +135,8 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _LightingGradientThresholdEnd: 0.15
-    - _LightingGradientThresholdStart: 0.02
+    - _LightingGradientThresholdEnd: 0.09792682
+    - _LightingGradientThresholdStart: 0.014291983
     - _MaxVal: 0.9
     - _Metallic: 0
     - _MinGradient: 0.01
@@ -144,7 +145,7 @@ Material:
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _SamplingRateMultiplier: 1
+    - _SamplingRateMultiplier: 1.58
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -157,7 +158,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _ShadowVolumeTextureSize: {r: 1, g: 1, b: 1, a: 1}
+    - _ShadowVolumeTextureSize: {r: 512, g: 512, b: 512, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _TextureSize: {r: 128, g: 256, b: 256, a: 0}
   m_BuildTextureStacks: []
