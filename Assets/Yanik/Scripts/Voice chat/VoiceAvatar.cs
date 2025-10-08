@@ -3,6 +3,7 @@ using Adrenak.UniVoice;
 using Adrenak.UniMic;
 using FishNet.Object;
 using System.Collections;
+using System;
 
 namespace FishyVoice
 {
@@ -19,7 +20,7 @@ namespace FishyVoice
 
     private IEnumerator StartVoiceAgent()
     {
-      // wait for VoiceNetwork instance and network to be ready
+      // wait for VoiceNetwork instance and the network to be ready
       while (VoiceNetwork.instance == null || !VoiceNetwork.instance.networkActive)
       {
         yield return new WaitForSeconds(0.1f);
@@ -27,50 +28,58 @@ namespace FishyVoice
 
       VoiceNetwork voiceNetwork = VoiceNetwork.instance;
 
+      try
+      {
+        agent = voiceNetwork.CreateAgent();
+        if (agent == null)
+          yield break;
+      }
+      catch (Exception e)
+      {
+        Debug.LogError($"{e.Message}");
+        yield break;
+      }
+
+      // if room does not exist, host creates it
+      if (IsServer)
+      {
+        if (voiceNetwork.openRooms.ContainsKey(chatroomName))
+        {
+          Debug.Log($"Host creating chatroom {chatroomName}");
+          voiceNetwork.HostChatroom(chatroomName);
+        }
+      }
+
       // wait for room to exist
       if (IsServer)
       {
         while (!voiceNetwork.openRooms.ContainsKey(chatroomName))
         {
-          Debug.Log($"Client {LocalConnection.ClientId} waiting for {chatroomName} room creation on server.");
+          Debug.Log($"Waiting for {chatroomName} room creation on server.");
           yield return new WaitForSeconds(0.1f);
         }
       }
 
-      // create agent for all clients
-      agent = voiceNetwork.CreateAgent();
-      if (agent == null)
+      try
       {
+        agent.JoinChatroom(chatroomName);
+        Debug.Log($"Client {LocalConnection.ClientId} joined chatroom {chatroomName}");
+      }
+      catch (Exception e)
+      {
+        Debug.LogError($"{e.Message}");
         yield break;
-      }
-
-      // host creates the room if it doesn't exist
-      if (IsServer && !voiceNetwork.openRooms.ContainsKey(chatroomName))
-      {
-        Debug.Log($"Host (ClientId={LocalConnection.ClientId}) creating room {chatroomName}.");
-        voiceNetwork.HostChatroom(chatroomName);
-      }
-
-      // wait for room to exist (for clients and host)
-      while (!voiceNetwork.openRooms.ContainsKey(chatroomName))
-      {
-        Debug.Log($"Client {LocalConnection.ClientId} waiting for {chatroomName} room creation.");
-        yield return new WaitForSeconds(0.1f);
-      }
-
-      agent.JoinChatroom(chatroomName);
-      Debug.Log($"Voice agent created and joined {chatroomName} room for Client {LocalConnection.ClientId}.");
-
-      // verify microphone status for debugging
-      if (Mic.Instance != null)
-      {
-        Debug.Log($"Microphone recording: {Mic.Instance.IsRecording}, Frequency: {Mic.Instance.Frequency}.");
       }
     }
 
     public override void OnStopClient()
     {
-      base.OnStopClient(); // ensure original base functions are run
+      base.OnStopClient(); // ensure original OnStopClient functions are run
+      if (IsServer)
+      {
+        return; // dont want host to leave the chatroom
+      }
+
       if (agent != null)
       {
         try
