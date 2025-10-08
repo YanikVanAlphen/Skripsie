@@ -32,6 +32,9 @@ public class VolumeDataControlUI : NetworkBehaviour
   public TextMeshProUGUI scaleText;
 
   public Button spawnCrossSectionButton;
+
+  public Slider minVisibilitySlider;
+  public Slider maxVisibilitySlider;
   // ---------------------------------------
 
   private VolumeRenderedObject volumeObject;
@@ -40,6 +43,10 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void Start()
   {
+    // set initial visibility ranges
+    maxVisibilitySlider.value = 1f;
+    minVisibilitySlider.value = 0f;
+
     if (volumeDataNetworker == null)
     {
       // runtime assignment of VolumeDataNetworker component since the data menu spawns at runtime
@@ -112,6 +119,10 @@ public class VolumeDataControlUI : NetworkBehaviour
       scaleSlider.onValueChanged.AddListener(OnScaleSliderChanged);
     if (spawnCrossSectionButton != null)
       spawnCrossSectionButton.onClick.AddListener(OnSpawnCrossSectionButtonClicked);
+    if (minVisibilitySlider != null)
+      minVisibilitySlider.onValueChanged.AddListener(OnMinVisibilitySliderChanged);
+    if (maxVisibilitySlider != null)
+      maxVisibilitySlider.onValueChanged.AddListener(OnMaxVisibilitySliderChanged);
   }
 
   private void UpdateInteractableState()
@@ -199,9 +210,6 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void OnPositionIncrementClicked()
   {
-    // request ownership of canvas to edit
-    //RequestCanvasOwnership();
-
     if (!CanInteract() || volumeObject == null)
       return;
 
@@ -229,7 +237,6 @@ public class VolumeDataControlUI : NetworkBehaviour
         break;
     }
 
-    //volumeObject.transform.position = newPos;
     Debug.Log($"Set volumetric data position to {newPos}.");
 
     SetPositionServerRpc(newPos);
@@ -237,9 +244,6 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void OnPositionDecrementClicked()
   {
-    // request ownership of canvas to edit
-    //RequestCanvasOwnership();
-
     if (!CanInteract() || volumeObject == null)
       return;
 
@@ -267,7 +271,6 @@ public class VolumeDataControlUI : NetworkBehaviour
         break;
     }
 
-    //volumeObject.transform.position = newPos;
     Debug.Log($"Set volumetric data position to {newPos}.");
 
     SetPositionServerRpc(newPos);
@@ -275,9 +278,6 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void OnRotationIncrementClicked()
   {
-    // request ownership of canvas to edit
-    //RequestCanvasOwnership();
-
     if (!CanInteract() || volumeObject == null)
       return;
 
@@ -306,7 +306,6 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     Quaternion deltaRotation = Quaternion.AngleAxis(rotationIncrement, rotationAxis);
     Quaternion newRot = volumeObject.transform.rotation * deltaRotation; // apply change in rotation relative to current rotation
-    //volumeObject.transform.rotation = newRot;
 
     Vector3 euler = newRot.eulerAngles;
     euler.x = NormalizeAngle(euler.x);
@@ -319,9 +318,6 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void OnRotationDecrementClicked()
   {
-    // request ownership of canvas to edit
-    //RequestCanvasOwnership();
-
     if (!CanInteract() || volumeObject == null)
       return;
 
@@ -350,7 +346,6 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     Quaternion deltaRotation = Quaternion.AngleAxis(-rotationIncrement, rotationAxis);
     Quaternion newRot = volumeObject.transform.rotation * deltaRotation;
-    //volumeObject.transform.rotation = newRot;
 
     Vector3 euler = newRot.eulerAngles;
     euler.x = NormalizeAngle(euler.x);
@@ -363,9 +358,6 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void OnScaleSliderChanged(float value)
   {
-    // request ownership of canvas to edit
-    //RequestCanvasOwnership();
-
     if (!CanInteract() || volumeObject == null)
       return;
 
@@ -376,14 +368,34 @@ public class VolumeDataControlUI : NetworkBehaviour
     SetScaleServerRpc(value);
   }
 
+  private void OnMaxVisibilitySliderChanged(float value)
+  {
+    if (!CanInteract() || volumeObject == null)
+      return;
+
+    float maxValue = maxVisibilitySlider.value;
+    float minValue = minVisibilitySlider.value;
+    Debug.Log($"Set volumetric data maximum visibility to {maxValue}.");
+    SetVisibilityWindowServerRpc(minValue, maxValue);
+  }
+
+  private void OnMinVisibilitySliderChanged(float value)
+  {
+    if (!CanInteract() || volumeObject == null)
+      return;
+
+    float maxValue = maxVisibilitySlider.value;
+    float minValue = minVisibilitySlider.value;
+    Debug.Log($"Set volumetric data minimum visibility to {minValue}.");
+    SetVisibilityWindowServerRpc(minValue, maxValue);
+  }
+
   private void OnSpawnCrossSectionButtonClicked()
   {
     if (volumeObject == null)
       return;
 
     Debug.Log("Requested spawn of CrossSectionPlane.");
-    // request ownership of canvas to edit
-    //RequestCanvasOwnership();
 
     if (spawnCrossSectionButton != null)
       spawnCrossSectionButton.interactable = false; // disable to prevent double-click spawning
@@ -402,7 +414,6 @@ public class VolumeDataControlUI : NetworkBehaviour
     SetPositionClientRpc(newPos);
   }
 
-  //[Client]
   [ObserversRpc]
   private void SetPositionClientRpc(Vector3 newPos) // runs on clients to execute actual change in client's local scene -> synched with server state
   {
@@ -419,7 +430,6 @@ public class VolumeDataControlUI : NetworkBehaviour
     SetScaleClientRpc(scale);
   }
 
-  //[Client]
   [ObserversRpc]
   private void SetScaleClientRpc(float scale)
   {
@@ -436,7 +446,6 @@ public class VolumeDataControlUI : NetworkBehaviour
     SetRotationClientRpc(newRot);
   }
 
-  //[Client]
   [ObserversRpc]
   private void SetRotationClientRpc(Quaternion newRot)
   {
@@ -451,29 +460,21 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  //private void RequestCanvasOwnership()
-  //{
-  //  OwnershipManager ownershipManager = GetComponent<OwnershipManager>();
-  //  if (ownershipManager == null)
-  //    return;
+  [ServerRpc(RequireOwnership = false)]
+  private void SetVisibilityWindowServerRpc(float min, float max)
+  {
+    SetVisibilityWindowClientRpc(min, max);
+  }
 
-  //  if (!IsOwner)
-  //  {
-  //    NetworkConnection localConnection = NetworkManager.ClientManager.Connection;
-  //    RequestCanvasOwnershipServerRpc(localConnection.ClientId);
-  //  }
-  //}
-
-  //[ServerRpc(RequireOwnership = false)]
-  //private void RequestCanvasOwnershipServerRpc(int clientId)
-  //{
-  //  NetworkConnection requester = ServerManager.Clients[clientId];
-  //  if (requester != null && NetworkObject.Owner != requester)
-  //  {
-  //    NetworkObject.GiveOwnership(requester);
-  //    Debug.Log($"Canvas ownership transferred to client {clientId}");
-  //  }
-  //}
+  [ObserversRpc]
+  private void SetVisibilityWindowClientRpc(float min, float max)
+  {
+    if (volumeObject != null)
+    {
+      volumeObject.SetVisibilityWindow(min, max);
+      Debug.Log($"Client {NetworkManager.ClientManager.Connection.ClientId} updated visibility window to min={min}, max={max}.");
+    }
+  }
 
   private bool CanInteract()
   {
