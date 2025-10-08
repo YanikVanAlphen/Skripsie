@@ -200,7 +200,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   private void OnPositionIncrementClicked()
   {
     // request ownership of canvas to edit
-    RequestCanvasOwnership();
+    //RequestCanvasOwnership();
 
     if (!CanInteract() || volumeObject == null)
       return;
@@ -238,7 +238,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   private void OnPositionDecrementClicked()
   {
     // request ownership of canvas to edit
-    RequestCanvasOwnership();
+    //RequestCanvasOwnership();
 
     if (!CanInteract() || volumeObject == null)
       return;
@@ -276,7 +276,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   private void OnRotationIncrementClicked()
   {
     // request ownership of canvas to edit
-    RequestCanvasOwnership();
+    //RequestCanvasOwnership();
 
     if (!CanInteract() || volumeObject == null)
       return;
@@ -320,7 +320,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   private void OnRotationDecrementClicked()
   {
     // request ownership of canvas to edit
-    RequestCanvasOwnership();
+    //RequestCanvasOwnership();
 
     if (!CanInteract() || volumeObject == null)
       return;
@@ -364,7 +364,7 @@ public class VolumeDataControlUI : NetworkBehaviour
   private void OnScaleSliderChanged(float value)
   {
     // request ownership of canvas to edit
-    RequestCanvasOwnership();
+    //RequestCanvasOwnership();
 
     if (!CanInteract() || volumeObject == null)
       return;
@@ -383,7 +383,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     Debug.Log("Requested spawn of CrossSectionPlane.");
     // request ownership of canvas to edit
-    RequestCanvasOwnership();
+    //RequestCanvasOwnership();
 
     if (spawnCrossSectionButton != null)
       spawnCrossSectionButton.interactable = false; // disable to prevent double-click spawning
@@ -451,29 +451,29 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  private void RequestCanvasOwnership()
-  {
-    OwnershipManager ownershipManager = GetComponent<OwnershipManager>();
-    if (ownershipManager == null)
-      return;
+  //private void RequestCanvasOwnership()
+  //{
+  //  OwnershipManager ownershipManager = GetComponent<OwnershipManager>();
+  //  if (ownershipManager == null)
+  //    return;
 
-    if (!IsOwner)
-    {
-      NetworkConnection localConnection = NetworkManager.ClientManager.Connection;
-      RequestCanvasOwnershipServerRpc(localConnection.ClientId);
-    }
-  }
+  //  if (!IsOwner)
+  //  {
+  //    NetworkConnection localConnection = NetworkManager.ClientManager.Connection;
+  //    RequestCanvasOwnershipServerRpc(localConnection.ClientId);
+  //  }
+  //}
 
-  [ServerRpc(RequireOwnership = false)]
-  private void RequestCanvasOwnershipServerRpc(int clientId)
-  {
-    NetworkConnection requester = ServerManager.Clients[clientId];
-    if (requester != null && NetworkObject.Owner != requester)
-    {
-      NetworkObject.GiveOwnership(requester);
-      Debug.Log($"Canvas ownership transferred to client {clientId}");
-    }
-  }
+  //[ServerRpc(RequireOwnership = false)]
+  //private void RequestCanvasOwnershipServerRpc(int clientId)
+  //{
+  //  NetworkConnection requester = ServerManager.Clients[clientId];
+  //  if (requester != null && NetworkObject.Owner != requester)
+  //  {
+  //    NetworkObject.GiveOwnership(requester);
+  //    Debug.Log($"Canvas ownership transferred to client {clientId}");
+  //  }
+  //}
 
   private bool CanInteract()
   {
