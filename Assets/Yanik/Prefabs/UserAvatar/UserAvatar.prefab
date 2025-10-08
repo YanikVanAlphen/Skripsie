@@ -144,7 +144,6 @@ GameObject:
   - component: {fileID: 7562621471391547086}
   - component: {fileID: 4218619597045536751}
   - component: {fileID: -3399695315769497911}
-  - component: {fileID: -7481465844520219532}
   - component: {fileID: -5975995160985179783}
   m_Layer: 0
   m_Name: UserAvatar
@@ -190,7 +189,7 @@ MonoBehaviour:
   - {fileID: 7562621471391547086}
   - {fileID: 4218619597045536751}
   - {fileID: -3399695315769497911}
-  - {fileID: -7481465844520219532}
+  - {fileID: 0}
   - {fileID: 4684108599029529862}
   - {fileID: 4204874466464247169}
   - {fileID: 8828077092818831133}
@@ -339,28 +338,6 @@ MonoBehaviour:
   _componentIndexCache: 2
   _addedNetworkObject: {fileID: 7851710499402613257}
   _networkObjectCache: {fileID: 7851710499402613257}
---- !u!114 &-7481465844520219532
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4197596904335732693}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4fd97f4c72717154d977c7ac6ff450c7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _componentIndexCache: 3
-  _addedNetworkObject: {fileID: 7851710499402613257}
-  _networkObjectCache: {fileID: 7851710499402613257}
-  maxDistance: 10
-  rolloffDistance: 5
-  spatialize: 1
-  minGain: 1
-  maxGain: 1
-  offset: 0
-  rolloffFactor: 3
 --- !u!82 &-5975995160985179783
 AudioSource:
   m_ObjectHideFlags: 0
