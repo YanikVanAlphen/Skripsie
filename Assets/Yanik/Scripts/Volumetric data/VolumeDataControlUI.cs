@@ -45,12 +45,56 @@ public class VolumeDataControlUI : NetworkBehaviour
       // runtime assignment of VolumeDataNetworker component since the data menu spawns at runtime
       volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
     }
-    if (volumeDataNetworker != null)
-      volumeDataNetworker.OnVolumeSpawned += OnVolumeSpawned; // subscribe to OnVolumeSpawned event to know when to start searching for the VolumeObject - make sure timing is right
+    StartCoroutine(FindVolumeObject());
     SetupUI();
     UpdateInteractableState();
     // continually update menu labels as the volume is manipulated
     StartCoroutine(UpdateLabels());
+  }
+
+  private IEnumerator FindVolumeObject()
+  {
+    int retryCount = 0;
+    const int maxRetries = 120;
+
+    while (volumeObject == null && retryCount < maxRetries)
+    {
+      if (volumeDataNetworker != null && volumeDataNetworker.volumeRenderedObjectPrefab != null)
+      {
+        NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
+        int expectedPrefabId = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId;
+
+        NetworkObject targetNetObj = null;
+        foreach (NetworkObject nob in networkObjects)
+        {
+          if (nob.PrefabId == expectedPrefabId)
+          {
+            targetNetObj = nob;
+            break;
+          }
+        }
+
+        if (targetNetObj != null)
+        {
+          volumeObject = targetNetObj.GetComponent<VolumeRenderedObject>();
+          if (volumeObject != null)
+          {
+            Debug.Log($"Found volumeObject (ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId})");
+          }
+          else
+          {
+            Debug.LogWarning($"NetworkObject found (ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId}) but missing VolumeRenderedObject component.");
+          }
+        }
+      }
+      if (volumeObject == null)
+      {
+        retryCount++;
+        yield return new WaitForSeconds(0.5f);
+      }
+    }
+    if (volumeObject == null)
+      Debug.LogError($"Failed to find VolumeRenderedObject.");
   }
 
   private void SetupUI()
@@ -68,41 +112,6 @@ public class VolumeDataControlUI : NetworkBehaviour
       scaleSlider.onValueChanged.AddListener(OnScaleSliderChanged);
     if (spawnCrossSectionButton != null)
       spawnCrossSectionButton.onClick.AddListener(OnSpawnCrossSectionButtonClicked);
-  }
-
-  private void OnDestroy()
-  {
-    // unsubscribe from OnVolumeSpawned event
-    if (volumeDataNetworker != null)
-      volumeDataNetworker.OnVolumeSpawned -= OnVolumeSpawned;
-  }
-
-  private void OnVolumeSpawned(int objectId)
-  {
-    // notified that VolumeObject has been spawned, can now start looking for it
-    StartCoroutine(WaitForVolumeObject(objectId));
-  }
-
-  private IEnumerator WaitForVolumeObject(int objectId)
-  {
-    int retryCount = 0;
-    const int maxRetries = 60;
-
-    while (volumeObject == null && retryCount < maxRetries)
-    {
-      // NetworkManager.ClientManager.Objects.Spawned from FishNet maps ObjectIDs to NetworkObjects that have been spawned and synced to the client
-      // TryGetValue tries to get the NetworkObject, if it succeeds then it assigns it to networkObject. (https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.dictionary-2.trygetvalue?view=net-9.0)
-      if (NetworkManager.ClientManager.Objects.Spawned.TryGetValue(objectId, out NetworkObject networkObject))
-      {
-        volumeObject = networkObject.GetComponent<VolumeRenderedObject>();
-        Debug.Log($"VolumeDataControlUI: Found VolumeRenderedObject (ObjectId={objectId})");
-        yield break;
-      }
-
-      retryCount++;
-      yield return new WaitForSeconds(0.5f);
-    }
-    Debug.LogError($"VolumeDataControlUI: Failed to find VolumeRenderedObject with ObjectId={objectId} after retries.");
   }
 
   private void UpdateInteractableState()
