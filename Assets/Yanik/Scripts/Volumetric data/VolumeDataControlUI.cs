@@ -102,33 +102,34 @@ public class VolumeDataControlUI : NetworkBehaviour
       retryCount++;
       yield return new WaitForSeconds(0.5f);
     }
+    Debug.LogError($"VolumeDataControlUI: Failed to find VolumeRenderedObject with ObjectId={objectId} after retries.");
   }
 
   private void UpdateInteractableState()
   {
-    bool isPermitted = IsOwner || IsServer; // IsOwner and IsServer provided directly by FishNet - indicates ownership
+    bool isOwner = IsOwner || IsServer; // IsOwner and IsServer provided directly by FishNet - indicates ownership
     // allow or block anything who isnt owner of canvas from editing
     if (positionAxisDropdown != null)
-      positionAxisDropdown.interactable = isPermitted;
+      positionAxisDropdown.interactable = isOwner;
     if (positionIncrementButton != null)
-      positionIncrementButton.interactable = isPermitted;
+      positionIncrementButton.interactable = isOwner;
     if (positionDecrementButton != null)
-      positionDecrementButton.interactable = isPermitted;
+      positionDecrementButton.interactable = isOwner;
     if (rotationAxisDropdown != null)
-      rotationAxisDropdown.interactable = isPermitted;
+      rotationAxisDropdown.interactable = isOwner;
     if (rotationIncrementButton != null)
-      rotationIncrementButton.interactable = isPermitted;
+      rotationIncrementButton.interactable = isOwner;
     if (rotationDecrementButton != null)
-      rotationDecrementButton.interactable = isPermitted;
+      rotationDecrementButton.interactable = isOwner;
     if (scaleSlider != null)
-      scaleSlider.interactable = isPermitted;
+      scaleSlider.interactable = isOwner;
   }
 
   public override void OnOwnershipClient(NetworkConnection prevOwner) // callback function for when ownership of object changes
   {
     base.OnOwnershipClient(prevOwner); // ensure all default ownersip change functions are called
     UpdateInteractableState(); // only new owner can interact
-    if (IsOwner && volumeObject != null) // should this not be !IsOwner??
+    if (IsOwner && volumeObject != null)
     {
       NetworkObject volumeNetworkObject = volumeObject.GetComponent<NetworkObject>();
       if (volumeNetworkObject != null && volumeNetworkObject.Owner != Owner) // change in ownership

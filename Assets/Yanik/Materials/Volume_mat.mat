@@ -135,8 +135,8 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _LightingGradientThresholdEnd: 0.09792682
-    - _LightingGradientThresholdStart: 0.014291983
+    - _LightingGradientThresholdEnd: 0.15
+    - _LightingGradientThresholdStart: 0.02
     - _MaxVal: 0.9
     - _Metallic: 0
     - _MinGradient: 0.01
@@ -145,7 +145,7 @@ Material:
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _SamplingRateMultiplier: 1.58
+    - _SamplingRateMultiplier: 1
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
