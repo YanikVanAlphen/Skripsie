@@ -43,7 +43,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   private void Start()
   {
-    // set initial visibility ranges
+    // set initial visibility ranges on sliders
     maxVisibilitySlider.value = 1f;
     minVisibilitySlider.value = 0f;
 
@@ -375,6 +375,12 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     float maxValue = maxVisibilitySlider.value;
     float minValue = minVisibilitySlider.value;
+    if (maxValue <= minValue)
+    {
+      maxValue = minValue;
+      maxVisibilitySlider.value = maxValue;
+      minVisibilitySlider.value = minValue;
+    }
     Debug.Log($"Set volumetric data maximum visibility to {maxValue}.");
     SetVisibilityWindowServerRpc(minValue, maxValue);
   }
@@ -386,6 +392,12 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     float maxValue = maxVisibilitySlider.value;
     float minValue = minVisibilitySlider.value;
+    if (maxValue <= minValue)
+    {
+      minValue = maxValue;
+      maxVisibilitySlider.value = maxValue;
+      minVisibilitySlider.value = minValue;
+    }
     Debug.Log($"Set volumetric data minimum visibility to {minValue}.");
     SetVisibilityWindowServerRpc(minValue, maxValue);
   }

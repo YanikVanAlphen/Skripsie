@@ -37,26 +37,34 @@ namespace FishyVoice
         }
       }
 
-      try
+      // create agent for all clients
+      agent = voiceNetwork.CreateAgent();
+      if (agent == null)
       {
-        // create agent for all clients
-        agent = voiceNetwork.CreateAgent();
-        if (agent == null)
-        {
-          yield break;
-        }
-        agent.JoinChatroom(chatroomName);
-        Debug.Log($"Voice agent created and joined {chatroomName} room for Client {LocalConnection.ClientId}.");
-
-        // verify microphone status for debugging
-        if (Mic.Instance != null)
-        {
-          Debug.Log($"Microphone recording: {Mic.Instance.IsRecording}, Frequency: {Mic.Instance.Frequency}.");
-        }
+        yield break;
       }
-      catch (System.Exception e)
+
+      // host creates the room if it doesn't exist
+      if (IsServer && !voiceNetwork.openRooms.ContainsKey(chatroomName))
       {
-        Debug.LogError($"Failed to setup voice agent for client {LocalConnection.ClientId}: {e.Message}.");
+        Debug.Log($"Host (ClientId={LocalConnection.ClientId}) creating room {chatroomName}.");
+        voiceNetwork.HostChatroom(chatroomName);
+      }
+
+      // wait for room to exist (for clients and host)
+      while (!voiceNetwork.openRooms.ContainsKey(chatroomName))
+      {
+        Debug.Log($"Client {LocalConnection.ClientId} waiting for {chatroomName} room creation.");
+        yield return new WaitForSeconds(0.1f);
+      }
+
+      agent.JoinChatroom(chatroomName);
+      Debug.Log($"Voice agent created and joined {chatroomName} room for Client {LocalConnection.ClientId}.");
+
+      // verify microphone status for debugging
+      if (Mic.Instance != null)
+      {
+        Debug.Log($"Microphone recording: {Mic.Instance.IsRecording}, Frequency: {Mic.Instance.Frequency}.");
       }
     }
 
