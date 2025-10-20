@@ -63,6 +63,23 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
+  public override void OnStartClient()
+  {
+    base.OnStartClient();
+    if (!IsServer)
+      RequestCurrentDatasetServerRpc(NetworkManager.ClientManager.Connection);
+  }
+
+  [ServerRpc(RequireOwnership = false)]
+  private void RequestCurrentDatasetServerRpc(NetworkConnection conn)
+  {
+    if (isVolumeSpawned && volumeObject != null && dataChunks != null && dataChunks.Length > 0)
+    {
+      Debug.Log($"Sending dataset to client {conn.ClientId}.");
+      StartCoroutine(SendDatasetToClient(conn, dataChunks));
+    }
+  }
+
   private IEnumerator NetworkVolumeObject()
   {
     if (isVolumeSpawned)
@@ -137,7 +154,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  [TargetRpc] // RPC used to run logic on a specific target client - conn is the client to target/connection the data is going to
+  [TargetRpc] // RPC used to run logic on a specific target client. conn is the client to target/connection the data is going to
   private void TargetSendDatasetChunk(NetworkConnection conn, int chunkIndex, int totalChunks, byte[] chunk)
   {
     if (!IsServer)
