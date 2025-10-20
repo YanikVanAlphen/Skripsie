@@ -192,7 +192,7 @@ public class VolumeDataNetworker : NetworkBehaviour
         Debug.LogError("Client failed to deserialize dataset.");
         yield break;
       }
-      
+
       StartCoroutine(AssignLocalDataset(dataset));
     }
     yield return null;
