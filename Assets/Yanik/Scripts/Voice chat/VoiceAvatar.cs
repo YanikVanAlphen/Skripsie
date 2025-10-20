@@ -7,20 +7,20 @@ using System;
 
 namespace FishyVoice
 {
-  public class VoiceAvatar : FishNet.Object.NetworkBehaviour
+  public class VoiceAvatar : NetworkBehaviour
   {
     private Agent agent;
     private const string chatroomName = "<DEFAULT>";
 
     public override void OnStartClient()
     {
-      base.OnStartClient(); // ensure default init is done
+      base.OnStartClient();
       StartCoroutine(StartVoiceAgent());
     }
 
     private IEnumerator StartVoiceAgent()
     {
-      // wait for VoiceNetwork instance and the network to be ready
+      // wait for VoiceNetwork instance + network to be ready
       while (VoiceNetwork.instance == null || !VoiceNetwork.instance.networkActive)
       {
         yield return new WaitForSeconds(0.1f);
@@ -28,38 +28,34 @@ namespace FishyVoice
 
       VoiceNetwork voiceNetwork = VoiceNetwork.instance;
 
+      // wait for valid Id -> [-1] is invalid
+      while (LocalConnection.ClientId < 0)
+      {
+        yield return new WaitForSeconds(0.1f);
+      }
+
       try
       {
         agent = voiceNetwork.CreateAgent();
         if (agent == null)
+        {
+          Debug.LogError("Failed to create voice agent");
           yield break;
+        }
       }
       catch (Exception e)
       {
-        Debug.LogError($"{e.Message}");
+        Debug.LogError($"Error creating agent: {e.Message}");
         yield break;
       }
 
-      // if room does not exist, host creates it
-      if (IsServer)
+      // wait for the chatroom to exist
+      while (!voiceNetwork.openRooms.ContainsKey(chatroomName))
       {
-        if (voiceNetwork.openRooms.ContainsKey(chatroomName))
-        {
-          Debug.Log($"Host creating chatroom {chatroomName}");
-          voiceNetwork.HostChatroom(chatroomName);
-        }
+        yield return new WaitForSeconds(0.1f);
       }
 
-      // wait for room to exist
-      if (IsServer)
-      {
-        while (!voiceNetwork.openRooms.ContainsKey(chatroomName))
-        {
-          Debug.Log($"Waiting for {chatroomName} room creation on server.");
-          yield return new WaitForSeconds(0.1f);
-        }
-      }
-
+      // everyone joins the room
       try
       {
         agent.JoinChatroom(chatroomName);
@@ -67,31 +63,27 @@ namespace FishyVoice
       }
       catch (Exception e)
       {
-        Debug.LogError($"{e.Message}");
+        Debug.LogError($"Error joining chatroom: {e.Message}");
         yield break;
       }
     }
 
     public override void OnStopClient()
     {
-      base.OnStopClient(); // ensure original OnStopClient functions are run
-      if (IsServer)
-      {
-        return; // dont want host to leave the chatroom
-      }
+      base.OnStopClient();
 
       if (agent != null)
       {
         try
         {
-          // exit voice chat room and release resources safely
+          // safely leave chatroom and free agent
           agent.LeaveChatroom();
           agent.Dispose();
           Debug.Log($"Voice agent disposed for client {LocalConnection.ClientId}.");
         }
-        catch (System.Exception e)
+        catch (Exception e)
         {
-          Debug.LogError($"Failed to dispose voice agent: {e.Message}.");
+          Debug.LogError($"Failed to dispose voice agent: {e.Message}");
         }
         agent = null;
       }

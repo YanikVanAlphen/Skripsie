@@ -13,15 +13,16 @@ namespace VolumeData
   public class DataSetLoader
   {
     private readonly string datasetPath;
+    private readonly DatasetType dataType;
     private readonly string DVRShaderName = "VolumeRendering/DirectVolumeRenderingShader";
 
-    public DataSetLoader(string dataPath)
+    public DataSetLoader(string dataPath, DatasetType dataType)
     {
       this.datasetPath = dataPath;
-      //this.dataType = dataType; // let user decide the input?
+      this.dataType = dataType;
     }
 
-    public DataSetLoader() // overloaded constructor for client-side init
+    public DataSetLoader() // constructor for client-side init where dataset path not needed to set
     {
       this.datasetPath = string.Empty;
     }
@@ -29,7 +30,8 @@ namespace VolumeData
     public string GetDataPath()
     {
       string fullPath;
-      if (Application.isEditor) // if running in editor, look in assets path. if running in build, look in streamingassets path
+      // if running in editor, look in assets path. if running in build, look in streamingassets path
+      if (Application.isEditor)
       {
         fullPath = Path.Combine(Application.dataPath, datasetPath);
       }
@@ -44,7 +46,7 @@ namespace VolumeData
     {
       string fullPath = GetDataPath();
       VolumeDataset dataset = null;
-      DatasetType datasetType = DatasetImporterUtility.GetDatasetType(fullPath); // let plugin decide what datatype it is
+      DatasetType datasetType = this.dataType;
 
       if (datasetType == DatasetType.Unknown)
       {
@@ -54,92 +56,46 @@ namespace VolumeData
 
       try
       {
-        if (Directory.Exists(fullPath)) // directory based datasets (DICOM / ImageSequence)
+        if (Directory.Exists(fullPath)) // directory based datasets
         {
           if (datasetType == DatasetType.DICOM)
           {
-            IImageSequenceImporter importer = ImporterFactory.CreateImageSequenceImporter(ImageSequenceFormat.DICOM);
-            if (importer != null)
-            {
-              string[] dicomFiles = Directory.GetFiles(fullPath, "*.dcm", SearchOption.AllDirectories); // get all .dcm files to match SimpleITKDICOMImporter expected input
-              if (dicomFiles.Length > 0)
-              {
-                var series = importer.LoadSeries(dicomFiles); // plugin returns a grouped DICOM series
-                if (series != null && series.Any()) // contain at least one IImageSequenceSeries
-                {
-                  dataset = importer.ImportSeries(series.First(), new ImageSequenceImportSettings()); // get first valid series
-                }
-              }
-            }
+            dataset = GenerateDICOM(fullPath);
           }
           else if (datasetType == DatasetType.ImageSequence)
           {
-            IImageSequenceImporter importer = ImporterFactory.CreateImageSequenceImporter(ImageSequenceFormat.ImageSequence);
-            if (importer != null)
-            {
-              string[] validExtensions = new[] { ".png", ".jpg", ".jpeg", ".tiff", ".tif" }; // defined valid extensions according to what image sequence importer expects
-              string[] imageFiles = Directory.GetFiles(fullPath, "*.*", SearchOption.AllDirectories) // find all files within given dir - also searched subfolders
-                .Where(file => validExtensions.Contains(Path.GetExtension(file).ToLower())) // extract file extension and compare with list of valid extensions
-                .ToArray(); // convert to array for string array
-              if (imageFiles.Length > 0)
-              {
-                var series = importer.LoadSeries(imageFiles); // plugin takes array of image file paths and returns single series of images
-                if (series != null && series.Any())
-                {
-                  dataset = importer.ImportSeries(series.First(), new ImageSequenceImportSettings()); // get first series (usually only has one series)
-                }
-              }
-            }
-          }
-          else
-          {
-            Debug.LogError($"Directory found but dataset type not supported: {datasetType}");
-            return null;
+            dataset = GenerateImgSequence(fullPath);
           }
         }
         else if (File.Exists(fullPath)) // file based datasets
         {
-          if (datasetType == DatasetType.Raw) // plugin's ImporterFactory does not consider .raw files so create RAW importer manually
+          if (datasetType == DatasetType.Raw) // plugin's ImporterFactory does not support .raw files so create RAW importer manually
           {
-            string iniPath = Path.ChangeExtension(fullPath, ".ini"); // find .ini file if it exists
-            DatasetIniData ini = DatasetIniReader.ParseIniFile(iniPath);
-            if (ini == null)
-            {
-              Debug.LogWarning("No .ini found for RAW dataset, using defaults.");
-              ini = new DatasetIniData(); // make sure the defaults are set - per default values that plugin gives
-              ini.dimX = 128;
-              ini.dimY = 256;
-              ini.dimZ = 256;
-              ini.bytesToSkip = 0;
-              ini.format = DataContentFormat.Uint8;
-              ini.endianness = Endianness.LittleEndian;
-            }
-            RawDatasetImporter importer = new RawDatasetImporter(fullPath, ini.dimX, ini.dimY, ini.dimZ, ini.format, ini.endianness, ini.bytesToSkip);
-            dataset = importer.Import();
+            dataset = GenerateRaw(fullPath);
           }
           else
           {
             IImageFileImporter importer = null;
-            if (datasetType == DatasetType.NRRD)
-              importer = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NRRD);
-            else if (datasetType == DatasetType.NIFTI)
-              importer = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NIFTI);
-            else if (datasetType == DatasetType.PARCHG)
-              importer = ImporterFactory.CreateImageFileImporter(ImageFileFormat.VASP);
+            switch (datasetType)
+            {
+              case DatasetType.NRRD:
+                importer = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NRRD);
+                break;
+              case DatasetType.NIFTI:
+                importer = ImporterFactory.CreateImageFileImporter(ImageFileFormat.NIFTI);
+                break;
+              case DatasetType.PARCHG:
+                importer = ImporterFactory.CreateImageFileImporter(ImageFileFormat.VASP);
+                break;
+            }
 
-            if (importer != null)
-              dataset = importer.Import(fullPath); // plugin method to import data
+            dataset = importer.Import(fullPath); // plugin method to import data
           }
         }
         else
         {
-          Debug.LogError($"Path is not a valid file or directory: {fullPath}");
+          Debug.LogError($"Path is not valid: {fullPath}");
           return null;
-        }
-
-        if (dataset == null)
-        {
-          Debug.LogError($"Failed to load dataset from: {fullPath}.");
         }
       }
       catch (Exception e)
@@ -147,39 +103,87 @@ namespace VolumeData
         Debug.LogError($"Error importing dataset: {e.Message}");
       }
 
+      if (dataset == null)
+        Debug.LogError($"Failed to load dataset from: {fullPath}.");
+
+      return dataset;
+    }
+
+    private VolumeDataset GenerateDICOM(string fullPath)
+    {
+      VolumeDataset dataset = null;
+      IImageSequenceImporter importer = ImporterFactory.CreateImageSequenceImporter(ImageSequenceFormat.DICOM);
+
+      string[] dicomFiles = Directory.GetFiles(fullPath, "*.dcm", SearchOption.AllDirectories); // get all .dcm files to match SimpleITKDICOMImporter expected input
+      if (dicomFiles.Length > 0)
+      {
+        var series = importer.LoadSeries(dicomFiles); // plugin returns a grouped DICOM series
+        if (series != null && series.Any()) // contain at least one IImageSequenceSeries
+        {
+          dataset = importer.ImportSeries(series.First(), new ImageSequenceImportSettings()); // get first valid series
+        }
+      }
+      return dataset;
+    }
+
+    private VolumeDataset GenerateImgSequence(string fullPath)
+    {
+      VolumeDataset dataset = null;
+      IImageSequenceImporter importer = ImporterFactory.CreateImageSequenceImporter(ImageSequenceFormat.ImageSequence);
+      string[] validExtensions = new[] { ".png", ".jpg", ".jpeg", ".tiff", ".tif" }; // defined valid extensions according to what image sequence importer expects
+      string[] imageFiles = Directory.GetFiles(fullPath, "*.*", SearchOption.AllDirectories) // find all files within given dir - also searched subfolders
+        .Where(file => validExtensions.Contains(Path.GetExtension(file).ToLower())) // extract file extension and compare with list of valid extensions
+        .ToArray(); // convert to array for string array
+      if (imageFiles.Length > 0)
+      {
+        var series = importer.LoadSeries(imageFiles); // plugin takes array of image file paths and returns single series of images
+        if (series != null && series.Any())
+        {
+          dataset = importer.ImportSeries(series.First(), new ImageSequenceImportSettings()); // get first series (usually only has one series)
+        }
+      }
+      return dataset;
+    }
+
+    private VolumeDataset GenerateRaw(string fullPath)
+    {
+      VolumeDataset dataset;
+
+      string iniPath = Path.ChangeExtension(fullPath, ".ini"); // find .ini file if it exists
+      DatasetIniData ini = DatasetIniReader.ParseIniFile(iniPath);
+      if (ini == null)
+      {
+        Debug.LogWarning("No .ini found for RAW dataset, using defaults.");
+        ini = new DatasetIniData(); // make sure the defaults are set - per default values that plugin gives
+        ini.dimX = 128;
+        ini.dimY = 256;
+        ini.dimZ = 256;
+        ini.bytesToSkip = 0;
+        ini.format = DataContentFormat.Uint8;
+        ini.endianness = Endianness.LittleEndian;
+      }
+
+      RawDatasetImporter importer = new RawDatasetImporter(fullPath, ini.dimX, ini.dimY, ini.dimZ, ini.format, ini.endianness, ini.bytesToSkip);
+      dataset = importer.Import();
+
       return dataset;
     }
 
     public IEnumerator ConfigureVolumeRenderingAsync(VolumeRenderedObject volumeObject, VolumeDataset dataset)
     {
       if (volumeObject == null || dataset == null)
-      {
-        Debug.LogError("VolumeRenderedObject or dataset is null.");
         yield break;
-      }
 
-      /* RENDERING OPTIONS (from plugin):
-      * RenderMode.DirectVolumeRendering
-      * RenderMode.MaximumIntensityProjectipon (plugin author's typo, keep as is)
-      * RenderMode.IsosurfaceRendering
-      */
       volumeObject.dataset = dataset;
-      float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-      volumeObject.transform.localScale = Vector3.one / maxScale; // normalise the scaling + uniform scaling in all axes
-
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer"); // access VolumeContainer child of VolumeRenderedObject to explicitly set rendering params
+
+      float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
+      volumeObject.transform.localScale = Vector3.one / maxScale; // normalize scaling in all axes
+
       MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
       Shader volumeShader = Shader.Find(DVRShaderName);
-      if (volumeShader == null)
-      {
-        Debug.LogError($"Shader {DVRShaderName} not found.");
-        yield break;
-      }
       if (meshRenderer.sharedMaterial == null || meshRenderer.sharedMaterial.shader != volumeShader) // only create new material if the shader is wrong
-      {
         meshRenderer.sharedMaterial = new Material(volumeShader);
-        Debug.Log($"Applied shader {DVRShaderName} to VolumeContainer material.");
-      }
 
       // generate texture asynchronously
       Texture3D dataTexture = null;
@@ -187,56 +191,33 @@ namespace VolumeData
       yield return new WaitUntil(() => task.IsCompleted);
       yield return null; // wait an extra frame for Unity's texture processing
 
-      try
-      {
-        dataTexture = task.Result;
-        Debug.Log("Texture generation completed.");
-      }
-      catch (Exception e)
-      {
-        Debug.LogError($"Failed to generate data texture: {e.Message}");
-        yield break;
-      }
-
-      if (dataTexture != null)
-      {
-        meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
-        Debug.Log("Assigned dataset texture to material.");
-      }
-      else
-      {
-        Debug.LogError("Data texture is null after generation.");
-        yield break;
-      }
+      dataTexture = task.Result;
+      Debug.Log("Texture generation completed.");
+      meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
+      Debug.Log("Assigned dataset texture to material.");
 
       UnityVolumeRendering.TransferFunction tf = TransferFunctionDatabase.CreateTransferFunction();
       volumeObject.transferFunction = tf;
       Texture2D tfTexture = tf.GetTexture();
-      if (tfTexture != null)
-      {
-        meshRenderer.sharedMaterial.SetTexture("_TFTex", tfTexture);
-        Debug.Log("Assigned transfer function texture to material.");
-      }
-      else
-      {
-        Debug.LogWarning("Failed to get transfer function texture.");
-      }
+      meshRenderer.sharedMaterial.SetTexture("_TFTex", tfTexture);
+      Debug.Log("Assigned transfer function texture to material.");
 
       Texture2D noiseTexture = GenerateNoiseTexture();
-      if (noiseTexture != null)
-      {
-        meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture); // sharedMaterial actually modifies existing material where .material just copies it
-        Debug.Log("Assigned noise texture to material.");
-      }
-      else
-      {
-        Debug.LogWarning("Failed to generate noise texture.");
-      }
+      meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture); // sharedMaterial actually modifies existing material where .material just copies it
+      Debug.Log("Assigned noise texture to material.");
+
       meshRenderer.sharedMaterial.EnableKeyword("MODE_DVR");
       meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
       meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
       volumeObject.meshRenderer = meshRenderer;
 
+      /* 
+      * RENDERING OPTIONS (from UnityVolumeRendering plugin):
+      * -----------------------------------------------------
+      * RenderMode.DirectVolumeRendering
+      * RenderMode.MaximumIntensityProjectipon (plugin author's typo, keep as is)
+      * RenderMode.IsosurfaceRendering 
+      */
       volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
       volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
       volumeObject.UpdateMaterialProperties();

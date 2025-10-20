@@ -47,42 +47,12 @@ public class CrossSectionManager : NetworkBehaviour
       yield return new WaitForSeconds(0.1f);
     }
 
-    int expectedPrefabId = -1; // default is invalid ID
-    if (volumeDataNetworker.volumeRenderedObjectPrefab != null)
-    {
-      NetworkObject prefabNetObj = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
-      if (prefabNetObj != null)
-        expectedPrefabId = prefabNetObj.PrefabId;
-    }
-
-    NetworkObject volumeNetworkObject = null;
-    int retryCount = 0;
-    Dictionary<int, NetworkObject> spawnedObjects;
-    while (volumeNetworkObject == null && retryCount < 80)
-    {
-      if (IsServer)
-      {
-        spawnedObjects = NetworkManager.ServerManager.Objects.Spawned; // spawned objects from server perspective - what has been spawned
-      }
-      else
-      {
-        spawnedObjects = NetworkManager.ClientManager.Objects.Spawned; // spawned obects from client perspective - what has been networked to me
-      }
-      // search through spawned networked objects for VolumeRenderedObject
-      foreach (NetworkObject obj in spawnedObjects.Values)
-      {
-        if (obj.PrefabId == expectedPrefabId)
-        {
-          volumeNetworkObject = obj;
-          volumeObject = obj.GetComponent<VolumeRenderedObject>();
-          Debug.Log($"Found VolumeRenderedObject (ObjectId={obj.ObjectId})");
-          yield break;
-        }
-      }
-      retryCount++;
-      yield return new WaitForSeconds(0.5f);
-    }
-    Debug.LogError("Failed to find VolumeRenderedObject.");
+    NetworkObject networkObject = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+    var result = VolumeRenderObjectFindUtility.FindVolumeObject("CrossSectionManager", networkObject);
+    yield return result;
+    volumeObject = result.Current as VolumeRenderedObject;
+    if (volumeObject != null)
+      Debug.Log($"CrossSectionManager: Found VolumeRenderedObject");
   }
 
   [ServerRpc(RequireOwnership = false)]
@@ -115,92 +85,5 @@ public class CrossSectionManager : NetworkBehaviour
 
     isCrossSectionSpawned = true;
     Debug.Log($"Spawned CrossSectionPlane (ObjectId={crossSectionNetObj.ObjectId})");
-  }
-
-  private IEnumerator DelayConfigurePlaneObservers(int objectId)
-  {
-    Debug.Log($"Waiting for dataset before notifying clients (ObjectId={objectId})");
-    int retryCount = 0;
-    const int maxRetries = 50;
-    while (volumeObject == null || volumeObject.dataset == null)
-    {
-      if (retryCount >= maxRetries)
-      {
-        yield break;
-      }
-      retryCount++;
-      yield return new WaitForSeconds(0.2f);
-    }
-
-    ConfigurePlaneObserversRpc(objectId);
-    Debug.Log($"Notified clients to config CrossSectionPlane (ObjectId={objectId})");
-  }
-
-  [ObserversRpc]
-  private void ConfigurePlaneObserversRpc(int objectId)
-  {
-    if (!IsServer)
-      StartCoroutine(ConfigurePlaneOnClient(objectId));
-  }
-
-  private IEnumerator ConfigurePlaneOnClient(int objectId)
-  {
-    int datasetRetryCount = 0;
-    const int maxDatasetRetries = 50;
-    while (volumeObject == null || volumeObject.dataset == null)
-    {
-      if (datasetRetryCount >= maxDatasetRetries)
-      {
-        yield break;
-      }
-      datasetRetryCount++;
-      yield return new WaitForSeconds(0.2f);
-    }
-
-    // Find the spawned plane
-    NetworkObject planeNetObj = crossSectionNetObj;
-    if (planeNetObj == null || planeNetObj.ObjectId != objectId)
-    {
-      // fallback to manual search for plane
-      int retryCount = 0;
-      const int maxRetries = 50;
-
-      while (planeNetObj == null && retryCount < maxRetries)
-      {
-        if (NetworkManager.ClientManager.Objects.Spawned.TryGetValue(objectId, out planeNetObj))
-        {
-          break;
-        }
-
-        foreach (var nob in FindObjectsOfType<NetworkObject>())
-        {
-          if (nob.ObjectId == objectId)
-          {
-            planeNetObj = nob;
-            break;
-          }
-        }
-        if (planeNetObj == null)
-        {
-          Debug.Log($"Client waiting for CrossSectionPlane {objectId}, attempt {retryCount + 1}/{maxRetries}");
-          retryCount++;
-          yield return new WaitForSeconds(0.3f);
-        }
-      }
-    }
-
-    if (planeNetObj != null)
-    {
-      var planeComponent = planeNetObj.GetComponent<CrossSectionPlane>();
-      if (planeComponent != null)
-      {
-        planeComponent.SetTargetObject(volumeObject);
-        Debug.Log($"Client configured CrossSectionPlane (ObjectId={objectId})");
-      }
-    }
-    else
-    {
-      Debug.LogError($"Client failed to find CrossSectionPlane (ObjectId={objectId}).");
-    }
   }
 }

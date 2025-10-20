@@ -16,22 +16,18 @@ public class ConnectionSetup : MonoBehaviour
 {
   // private to other classes while still being editable in Unity Inspector
   [SerializeField] private NetworkManager networkManager;
-  [SerializeField] private GameObject ipInputFieldObject;
+  //[SerializeField] private GameObject ipInputFieldObject;
   [SerializeField] private string hostIP = "10.255.10.54"; // default host IP address
   [SerializeField] private ushort portNumber = 7770; // default FishNet port for comms
 
   public Canvas mainMenuCanvas;
   private const string VOICE_ROOM_NAME = "<DEFAULT>";
-  private bool chatroomCreated = false;
 
-  /// <summary>
-  /// Executes before first frame of program to subscribe to FishNet connection states.
-  /// </summary>
   private void Start()
   {
     InstanceFinder.ClientManager.OnClientConnectionState += ClientConnectionState; // handle client connecting/disconnecting
     InstanceFinder.ServerManager.OnServerConnectionState += ServerConnectionState; // handle server-side connection events
-    InstanceFinder.ServerManager.OnRemoteConnectionState += (conn, args) => RemoteConnectionState(conn, args); // handle remote client connection state
+    InstanceFinder.ServerManager.OnRemoteConnectionState += RemoteConnectionState; // handle remote client connection state
   }
 
   private void ServerConnectionState(ServerConnectionStateArgs args)
@@ -54,48 +50,38 @@ public class ConnectionSetup : MonoBehaviour
       yield return new WaitForSeconds(0.1f);
 
     VoiceNetwork voiceNetwork = VoiceNetwork.instance;
-    try
-    {
-      voiceNetwork.HostChatroom(VOICE_ROOM_NAME);
-      chatroomCreated = true;
-      Debug.Log($"Created voice chatroom: {VOICE_ROOM_NAME}");
-    }
-    catch (Exception e)
-    {
-      Debug.LogError($"Failed to create voice chatroom with message: {e.Message}");
-    }
+    voiceNetwork.HostChatroom(VOICE_ROOM_NAME);
+    Debug.Log($"Created voice chatroom: {VOICE_ROOM_NAME}");
   }
 
   private void ClientConnectionState(ClientConnectionStateArgs args)
   {
     Debug.Log($"Client state: {args.ConnectionState}");
-    if (args.ConnectionState == LocalConnectionState.Started) // client connection started
-    {
-      StartCoroutine(JoinVoiceRoomDelayed());
-    }
+    //if (args.ConnectionState == LocalConnectionState.Started) // client connection started
+    //{
+    //  StartCoroutine(JoinVoiceRoomDelayed());
+    //}
   }
 
-  private IEnumerator JoinVoiceRoomDelayed()
-  {
-    // Wait for server to start and client to have a valid ClientId
-    bool isServerStarted = InstanceFinder.ServerManager.Started;
-    int clientId = InstanceFinder.ClientManager.Connection.ClientId;
-    while (!isServerStarted || clientId < 0) // [-1] is invalid Id
-    {
-      yield return new WaitForSeconds(0.1f);
-    }
+  //private IEnumerator JoinVoiceRoomDelayed()
+  //{
+  //  // Wait for server to start and client to have a valid ClientId
+  //  while (!InstanceFinder.ServerManager.Started || InstanceFinder.ClientManager.Connection.ClientId < 0) // [-1] is invalid ID
+  //  {
+  //    yield return new WaitForSeconds(0.1f);
+  //  }
 
-    VoiceNetwork voiceNetwork = VoiceNetwork.instance;
-    try
-    {
-      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
-      Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
-    }
-    catch (Exception e)
-    {
-      Debug.LogError($"Client failed to join chatroom with message: {e.Message}");
-    }
-  }
+  //  VoiceNetwork voiceNetwork = VoiceNetwork.instance;
+  //  try
+  //  {
+  //    voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
+  //    Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
+  //  }
+  //  catch (Exception e)
+  //  {
+  //    Debug.LogError($"Client {InstanceFinder.ClientManager.Connection.ClientId} failed to join chatroom: {e.Message}");
+  //  }
+  //}
 
   private void RemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
   {
@@ -110,34 +96,34 @@ public class ConnectionSetup : MonoBehaviour
     if (InstanceFinder.ServerManager != null)
     {
       InstanceFinder.ServerManager.OnServerConnectionState -= ServerConnectionState;
-      InstanceFinder.ServerManager.OnRemoteConnectionState -= (conn, args) => RemoteConnectionState(conn, args);
+      InstanceFinder.ServerManager.OnRemoteConnectionState -= RemoteConnectionState;
     }
   }
 
   public void StartHost() // Host = server + client instance
   {
+    Debug.Log($"Starting Host on {hostIP}:{portNumber}");
     // set transport
     var tugboat = (Tugboat)networkManager.TransportManager.Transport;
     tugboat.SetClientAddress("127.0.0.1"); // Host-client connects to itself
     tugboat.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4); // config server to accept connections from any IP
     tugboat.SetPort(portNumber);
-    Debug.Log($"Starting Host on {hostIP}:{portNumber}");
     StartServer();
     StartClient();
   }
 
   public void StartServer()
   {
+    HideMenu();
     networkManager.ServerManager.StartConnection();
     Debug.Log("Server started");
-    HideMenu();
   }
 
   public void StartClient()
   {
+    HideMenu();
     networkManager.ClientManager.StartConnection();
     Debug.Log("Client connection started");
-    HideMenu();
   }
 
   public void SetIPAddress(GameObject ipInputFieldObject)
@@ -146,24 +132,16 @@ public class ConnectionSetup : MonoBehaviour
       return;
     // set transport
     var tugboat = (Tugboat)networkManager.TransportManager.Transport;
+
+    string ipAddress = hostIP; // default value
+
     if (ipInputFieldObject != null)
     {
       TMP_InputField inputField = ipInputFieldObject.GetComponent<TMP_InputField>();
       if (inputField != null && !string.IsNullOrEmpty(inputField.text))
-      {
-        tugboat.SetClientAddress(inputField.text);
-      }
-      else
-      {
-        tugboat.SetClientAddress(hostIP);
-        Debug.LogWarning($"IP input field is empty, using default host IP: {hostIP}");
-      }
+        ipAddress = inputField.text;
     }
-    else
-    {
-      tugboat.SetClientAddress(hostIP);
-      Debug.LogWarning($"ipInputFieldObject is null, using default host IP: {hostIP}");
-    }
+    tugboat.SetClientAddress(ipAddress);
     tugboat.SetPort(portNumber);
   }
 

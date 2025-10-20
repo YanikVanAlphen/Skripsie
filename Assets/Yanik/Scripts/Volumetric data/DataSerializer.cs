@@ -11,52 +11,65 @@ public static class DatasetSerializer
   {
     if (dataset == null || dataset.data == null || dataset.data.Length == 0)
     {
-      Debug.LogError("Error in serializing dataset: dataset is null or empty.");
+      Debug.LogError("Cant serialize dataset as it is null or empty.");
       return null;
     }
 
     try
     {
+      Debug.Log($"Serializing dataset: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}");
+      DateTime startTime = DateTime.Now;
+
       byte[] uncompressedData;
       using (MemoryStream stream = new MemoryStream())
       {
-        WriteInt32(stream, dataset.dimX); // 32 bit int
+        // int values
+        WriteInt32(stream, dataset.dimX);
         WriteInt32(stream, dataset.dimY);
         WriteInt32(stream, dataset.dimZ);
-        WriteSingle(stream, dataset.scale.x); // float values
-        WriteSingle(stream, dataset.scale.y);
-        WriteSingle(stream, dataset.scale.z);
+        // float values
+        WriteFloat(stream, dataset.scale.x);
+        WriteFloat(stream, dataset.scale.y);
+        WriteFloat(stream, dataset.scale.z);
 
         float[] data = dataset.data;
         WriteInt32(stream, data.Length);
-        Debug.Log($"Serializing dataset: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}, dataLength={data.Length}");
-        
+
         foreach (float value in data)
         {
-          WriteSingle(stream, value);
+          WriteFloat(stream, value);
         }
-        stream.Flush(); // make sure all data is fully written to stream before doing anything further
-        
-        uncompressedData = stream.ToArray();
-        Debug.Log($"Data size before compression: {uncompressedData.Length / 1024f / 1024f:F2} MB"); // convert size from bytes to megabytes
-      }
+        // make sure all data is fully written to stream before doing anything further
+        stream.Flush();
 
+        uncompressedData = stream.ToArray();
+      }
+      DateTime endTime = DateTime.Now;
+      TimeSpan duration = endTime - startTime;
+      Debug.Log($"Serialization took {duration.TotalSeconds} seconds.");
+      Debug.Log($"Data size before compression: {uncompressedData.Length / 1024f / 1024f:F2} MB"); // convert size from bytes to megabytes
+      startTime = DateTime.Now;
       // compress the data
       using (MemoryStream compressedStream = new MemoryStream())
       {
-        using (GZipStream gzip = new GZipStream(compressedStream, CompressionMode.Compress, leaveOpen: true)) // explicitly leave stream open - gives errors with ToArray function otherwise
+        using (GZipStream gzip = new GZipStream(compressedStream, CompressionMode.Compress, leaveOpen: true)) // explicitly leave stream open, gives errors with ToArray function otherwise
         {
           gzip.Write(uncompressedData, 0, uncompressedData.Length);
           gzip.Flush(); // make sure all compressed data is fully written
         }
         byte[] compressedData = compressedStream.ToArray();
+
+        endTime = DateTime.Now;
+        duration = endTime - startTime;
+        Debug.Log($"Compression took {duration.TotalSeconds} seconds.");
         Debug.Log($"Data size after compression: {compressedData.Length / 1024f / 1024f:F2} MB");
+
         return compressedData;
       }
     }
     catch (Exception e)
     {
-      Debug.LogError($"Could not serialize dataset: {e.Message}");
+      Debug.LogError($"{e.Message}");
       return null;
     }
   }
@@ -68,22 +81,26 @@ public static class DatasetSerializer
     stream.Write(bytes, 0, bytes.Length);
   }
 
-  private static void WriteSingle(Stream stream, float value)
+  private static void WriteFloat(Stream stream, float value)
   {
     byte[] bytes = BitConverter.GetBytes(value);
     stream.Write(bytes, 0, bytes.Length);
   }
+  //
 
   public static VolumeDataset Deserialize(byte[] compressedData)
   {
     if (compressedData == null || compressedData.Length == 0)
     {
-      Debug.LogError("Error in deserializing dataset: dataset is null or empty.");
+      Debug.LogError("Cant deserialize dataset as it is null or empty.");
       return null;
     }
 
     try // similar process to serialize and compress just inverted
     {
+      Debug.Log("Decompressing data.");
+      DateTime startTime = DateTime.Now;
+
       byte[] decompressedData;
       using (MemoryStream compressedStream = new MemoryStream(compressedData))
       using (MemoryStream decompressedStream = new MemoryStream())
@@ -96,6 +113,12 @@ public static class DatasetSerializer
         decompressedData = decompressedStream.ToArray();
       }
 
+      DateTime endTime = DateTime.Now;
+      TimeSpan duration = endTime - startTime;
+      Debug.Log($"Decompression took {duration.TotalSeconds} seconds.");
+      Debug.Log($"Deserializing dataset.");
+      startTime = DateTime.Now;
+
       using (MemoryStream stream = new MemoryStream(decompressedData))
       using (BinaryReader reader = new BinaryReader(stream)) // reads data in sequence
       {
@@ -106,10 +129,15 @@ public static class DatasetSerializer
         dataset.scale = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
         int dataLength = reader.ReadInt32();
         dataset.data = new float[dataLength];
-        Debug.Log($"Deserializing dataset: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}, dataLength={dataLength}");
+
         for (int i = 0; i < dataLength; i++) // rest of data
           dataset.data[i] = reader.ReadSingle();
-        Debug.Log($"Deserialized dataset successfully: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}");
+
+        endTime = DateTime.Now;
+        duration = endTime - startTime;
+        Debug.Log($"Deserialized dataset successfully: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}.");
+        Debug.Log($"Deserialization took {duration.TotalSeconds} seconds.");
+
         return dataset;
       }
     }
@@ -135,7 +163,7 @@ public static class DatasetSerializer
       int length = Math.Min(chunkSize, data.Length - (i * chunkSize)); // for case when remaining data for last chunk is less than 1MB
       chunks[i] = new byte[length];
       Array.Copy(data, i * chunkSize, chunks[i], 0, length);
-      Debug.Log($"Created chunk {(i+1).ToString()}/{numChunks}, size={length} bytes");
+      Debug.Log($"Created chunk {(i + 1).ToString()}/{numChunks}, size={length} bytes");
     }
     return chunks;
   }

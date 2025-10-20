@@ -1023,7 +1023,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   networkManager: {fileID: 1696469385}
-  ipInputFieldObject: {fileID: 1046704468}
   hostIP: 10.255.10.54
   portNumber: 7770
   mainMenuCanvas: {fileID: 1070816313}
@@ -1501,6 +1500,11 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 11400000, guid: 9c6b85ac99d036c4281782a52b59ef61,
         type: 2}
+    - target: {fileID: 1420177980032600304, guid: 7328e618e8dc5f84987e09f5e751e875,
+        type: 3}
+      propertyPath: _refreshDefaultPrefabs
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1420177980032600305, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
       propertyPath: m_Name
@@ -1944,6 +1948,7 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 2120035972}
   _networkObjectCache: {fileID: 2120035972}
   datasetPath: EasyVolumeRendering/DataFiles/vismale.raw
+  dataType: 1
   defaultPosition: {x: 0, y: 0, z: 0}
   defaultRotation: {x: 0, y: 0, z: 0, w: 1}
   volumeRenderedObjectPrefab: {fileID: 687899278494396546, guid: de632d9d963a5a946820d266937fae6d,

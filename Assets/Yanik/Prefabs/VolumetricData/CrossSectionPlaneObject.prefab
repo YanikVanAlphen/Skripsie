@@ -20,7 +20,7 @@ GameObject:
   - component: {fileID: -1038231713785398600}
   - component: {fileID: -8767058811515422781}
   - component: {fileID: -1580174705409596693}
-  - component: {fileID: -8407576767190141025}
+  - component: {fileID: 8493925206219434251}
   m_Layer: 0
   m_Name: CrossSectionPlaneObject
   m_TagString: Untagged
@@ -62,7 +62,6 @@ MonoBehaviour:
   - {fileID: 3427404316554884325}
   - {fileID: -8767058811515422781}
   - {fileID: -1580174705409596693}
-  - {fileID: -8407576767190141025}
   <ParentNetworkObject>k__BackingField: {fileID: 0}
   <ChildNetworkObjects>k__BackingField: []
   _isNetworked: 1
@@ -70,7 +69,7 @@ MonoBehaviour:
   _defaultDespawnType: 0
   NetworkObserver: {fileID: 0}
   <PrefabId>k__BackingField: 0
-  _scenePathHash: 37587222
+  _scenePathHash: 0
   <SceneId>k__BackingField: 0
   <AssetPathHash>k__BackingField: 3243410370009676415
   _sceneNetworkObjects:
@@ -272,7 +271,7 @@ MonoBehaviour:
   m_InteractionLayers:
     m_Bits: 2
   m_DistanceCalculationMode: 1
-  m_SelectMode: 0
+  m_SelectMode: 1
   m_FocusMode: 1
   m_CustomReticle: {fileID: 0}
   m_AllowGazeInteraction: 0
@@ -435,7 +434,7 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 6561966658566959881}
   _networkObjectCache: {fileID: 6561966658566959881}
   volumeObject: {fileID: 0}
---- !u!114 &-8407576767190141025
+--- !u!114 &8493925206219434251
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -444,9 +443,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 714467927515028049}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: af4e50fc1040e3b49a9ee3f253a6fa86, type: 3}
+  m_Script: {fileID: 11500000, guid: d0a1302d0d134fa8a2a5b3bf4aec3c20, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 4
-  _addedNetworkObject: {fileID: 6561966658566959881}
-  _networkObjectCache: {fileID: 6561966658566959881}
+  m_PermittedDisplacementAxes: 7
+  m_ConstrainedAxisDisplacementMode: 1
+  m_TwoHandedRotationMode: 2
+  m_AllowOneHandedScaling: 1
+  m_AllowTwoHandedScaling: 0
+  m_OneHandedScaleSpeed: 0.5
+  m_ThresholdMoveRatioForScale: 0.05
+  m_ClampScaling: 1
+  m_MinimumScaleRatio: 0.25
+  m_MaximumScaleRatio: 2
+  m_ScaleMultiplier: 0.25

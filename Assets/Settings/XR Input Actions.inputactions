@@ -1566,6 +1566,34 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "XRI RightHand A",
+            "id": "92fabdab-3d1f-4263-aa1d-ff61f452b24b",
+            "actions": [
+                {
+                    "name": "RightAButton",
+                    "type": "Button",
+                    "id": "8671bc01-ef10-4a12-a4ec-cc56c48b5118",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "7cadbeae-2347-43c1-9e61-80f28fb31705",
+                    "path": "<XRController>{RightHand}/{PrimaryButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RightAButton",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": [

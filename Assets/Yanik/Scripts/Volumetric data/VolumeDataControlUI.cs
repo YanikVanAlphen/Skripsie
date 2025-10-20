@@ -55,58 +55,24 @@ public class VolumeDataControlUI : NetworkBehaviour
     StartCoroutine(FindVolumeObject());
     SetupUI();
     UpdateInteractableState();
-    // continually update menu labels as the volume is manipulated
+    // continually update menu labels
     StartCoroutine(UpdateLabels());
   }
 
   private IEnumerator FindVolumeObject()
   {
-    int retryCount = 0;
-    const int maxRetries = 120;
-
-    while (volumeObject == null && retryCount < maxRetries)
+    if (volumeDataNetworker != null && volumeDataNetworker.volumeRenderedObjectPrefab != null)
     {
-      if (volumeDataNetworker != null && volumeDataNetworker.volumeRenderedObjectPrefab != null)
-      {
-        NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
-        int expectedPrefabId = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>().PrefabId;
-
-        NetworkObject targetNetObj = null;
-        foreach (NetworkObject nob in networkObjects)
-        {
-          if (nob.PrefabId == expectedPrefabId)
-          {
-            targetNetObj = nob;
-            break;
-          }
-        }
-
-        if (targetNetObj != null)
-        {
-          volumeObject = targetNetObj.GetComponent<VolumeRenderedObject>();
-          if (volumeObject != null)
-          {
-            Debug.Log($"Found volumeObject (ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId})");
-          }
-          else
-          {
-            Debug.LogWarning($"NetworkObject found (ObjectId={targetNetObj.ObjectId}, PrefabId={expectedPrefabId}) but missing VolumeRenderedObject component.");
-          }
-        }
-      }
-      if (volumeObject == null)
-      {
-        retryCount++;
-        yield return new WaitForSeconds(0.5f);
-      }
+      NetworkObject networkObject = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+      var result = VolumeRenderObjectFindUtility.FindVolumeObject("VolumeDataControlUI", networkObject);
+      yield return result;
+      volumeObject = result.Current as VolumeRenderedObject;
     }
-    if (volumeObject == null)
-      Debug.LogError($"Failed to find VolumeRenderedObject.");
   }
 
   private void SetupUI()
   {
-    // listener methods to activate on UI event handlers
+    // add listener methods to activate on UI pressed or changed event handlers
     if (positionIncrementButton != null)
       positionIncrementButton.onClick.AddListener(OnPositionIncrementClicked);
     if (positionDecrementButton != null)
@@ -120,9 +86,9 @@ public class VolumeDataControlUI : NetworkBehaviour
     if (spawnCrossSectionButton != null)
       spawnCrossSectionButton.onClick.AddListener(OnSpawnCrossSectionButtonClicked);
     if (minVisibilitySlider != null)
-      minVisibilitySlider.onValueChanged.AddListener(OnMinVisibilitySliderChanged);
+      minVisibilitySlider.onValueChanged.AddListener(OnVisibilitySlidersChanged);
     if (maxVisibilitySlider != null)
-      maxVisibilitySlider.onValueChanged.AddListener(OnMaxVisibilitySliderChanged);
+      maxVisibilitySlider.onValueChanged.AddListener(OnVisibilitySlidersChanged);
   }
 
   private void UpdateInteractableState()
@@ -148,27 +114,27 @@ public class VolumeDataControlUI : NetworkBehaviour
   public override void OnOwnershipClient(NetworkConnection prevOwner) // callback function for when ownership of object changes
   {
     base.OnOwnershipClient(prevOwner); // ensure all default ownersip change functions are called
-    UpdateInteractableState(); // only new owner can interact
+    UpdateInteractableState(); // update interactible state so that only new owner can interact
     if (IsOwner && volumeObject != null)
     {
       NetworkObject volumeNetworkObject = volumeObject.GetComponent<NetworkObject>();
       if (volumeNetworkObject != null && volumeNetworkObject.Owner != Owner) // change in ownership
       {
         volumeNetworkObject.GiveOwnership(Owner);
-        Debug.Log($"Transferred VolumeRenderedObject ownership to client {Owner.ClientId}, ObjectId={volumeNetworkObject.ObjectId}");
+        Debug.Log($"Transferred VolumeRenderedObject ownership to client {Owner.ClientId}.");
       }
     }
   }
 
   private IEnumerator UpdateLabels()
   {
+    // default params
+    float scale = 1.0f;
+    Vector3 pos = Vector3.zero;
+    Vector3 rot = Vector3.zero;
+
     while (true)
     {
-      // default params
-      float scale = 1.0f;
-      Vector3 pos = Vector3.zero;
-      Vector3 rot = Vector3.zero;
-
       if (volumeObject != null)
       {
         pos = volumeObject.transform.position;
@@ -200,11 +166,10 @@ public class VolumeDataControlUI : NetworkBehaviour
       // update scale text
       if (scaleText != null)
         scaleText.text = $"Scale: {scale:F2}";
-      if (scaleSlider != null)  
+      if (scaleSlider != null)
         scaleSlider.value = scale;
 
-      // update labels every 100ms - a bit brute force
-      yield return new WaitForSeconds(0.1f);
+      yield return new WaitForSeconds(0.1f); // a bit brute force but doesnt seem to have too much effect
     }
   }
 
@@ -215,9 +180,7 @@ public class VolumeDataControlUI : NetworkBehaviour
 
     int axisIndex = 0; // default value
     if (positionAxisDropdown != null)
-    {
       axisIndex = positionAxisDropdown.value; // set axisIndex to current axis selected by dropdown
-    }
     // get current position to modify
     Vector3 newPos = volumeObject.transform.position;
 
@@ -236,8 +199,6 @@ public class VolumeDataControlUI : NetworkBehaviour
         newPos.z = (float)Math.Round(newPos.z, 2);
         break;
     }
-
-    Debug.Log($"Set volumetric data position to {newPos}.");
 
     SetPositionServerRpc(newPos);
   }
@@ -271,8 +232,6 @@ public class VolumeDataControlUI : NetworkBehaviour
         break;
     }
 
-    Debug.Log($"Set volumetric data position to {newPos}.");
-
     SetPositionServerRpc(newPos);
   }
 
@@ -286,7 +245,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     {
       axisIndex = rotationAxisDropdown.value;
     }
-    Vector3 rotationAxis;
+    Vector3 rotationAxis = new Vector3(0f, 0f, 0f);
 
     switch (axisIndex)
     {
@@ -299,19 +258,10 @@ public class VolumeDataControlUI : NetworkBehaviour
       case 2: // z axis
         rotationAxis = Vector3.forward;
         break;
-      default:
-        rotationAxis = Vector3.up; // fallback to y axis
-        break;
     }
 
     Quaternion deltaRotation = Quaternion.AngleAxis(rotationIncrement, rotationAxis);
     Quaternion newRot = volumeObject.transform.rotation * deltaRotation; // apply change in rotation relative to current rotation
-
-    Vector3 euler = newRot.eulerAngles;
-    euler.x = NormalizeAngle(euler.x);
-    euler.y = NormalizeAngle(euler.y);
-    euler.z = NormalizeAngle(euler.z);
-    Debug.Log($"Set volumetric data rotation to Euler={euler}.");
 
     SetRotationServerRpc(newRot); // sync rotation to all clients
   }
@@ -326,7 +276,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     {
       axisIndex = rotationAxisDropdown.value;
     }
-    Vector3 rotationAxis;
+    Vector3 rotationAxis = new Vector3(0f, 0f, 0f);
 
     switch (axisIndex)
     {
@@ -339,19 +289,10 @@ public class VolumeDataControlUI : NetworkBehaviour
       case 2: // z axis
         rotationAxis = Vector3.forward;
         break;
-      default:
-        rotationAxis = Vector3.up; // fallback to y axis
-        break;
     }
 
     Quaternion deltaRotation = Quaternion.AngleAxis(-rotationIncrement, rotationAxis);
     Quaternion newRot = volumeObject.transform.rotation * deltaRotation;
-
-    Vector3 euler = newRot.eulerAngles;
-    euler.x = NormalizeAngle(euler.x);
-    euler.y = NormalizeAngle(euler.y);
-    euler.z = NormalizeAngle(euler.z);
-    Debug.Log($"Set volumetric data rotation to Euler={euler}.");
 
     SetRotationServerRpc(newRot);
   }
@@ -368,7 +309,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     SetScaleServerRpc(value);
   }
 
-  private void OnMaxVisibilitySliderChanged(float value)
+  private void OnVisibilitySlidersChanged(float value)
   {
     if (!CanInteract() || volumeObject == null)
       return;
@@ -381,24 +322,6 @@ public class VolumeDataControlUI : NetworkBehaviour
       maxVisibilitySlider.value = maxValue;
       minVisibilitySlider.value = minValue;
     }
-    Debug.Log($"Set volumetric data maximum visibility to {maxValue}.");
-    SetVisibilityWindowServerRpc(minValue, maxValue);
-  }
-
-  private void OnMinVisibilitySliderChanged(float value)
-  {
-    if (!CanInteract() || volumeObject == null)
-      return;
-
-    float maxValue = maxVisibilitySlider.value;
-    float minValue = minVisibilitySlider.value;
-    if (maxValue <= minValue)
-    {
-      minValue = maxValue;
-      maxVisibilitySlider.value = maxValue;
-      minVisibilitySlider.value = minValue;
-    }
-    Debug.Log($"Set volumetric data minimum visibility to {minValue}.");
     SetVisibilityWindowServerRpc(minValue, maxValue);
   }
 
@@ -420,7 +343,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     crossSectionManager.SpawnCrossSectionPlaneServerRpc(spawnPosition, spawnRotation, NetworkManager.ClientManager.Connection);
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)] // changed from 'false' since ownership IS required
   private void SetPositionServerRpc(Vector3 newPos) // make sure change is approved by server before clients see the update
   {
     SetPositionClientRpc(newPos);
@@ -436,7 +359,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)]
   private void SetScaleServerRpc(float scale)
   {
     SetScaleClientRpc(scale);
@@ -452,7 +375,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)]
   private void SetRotationServerRpc(Quaternion newRot)
   {
     SetRotationClientRpc(newRot);
@@ -472,7 +395,7 @@ public class VolumeDataControlUI : NetworkBehaviour
     }
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)]
   private void SetVisibilityWindowServerRpc(float min, float max)
   {
     SetVisibilityWindowClientRpc(min, max);
@@ -484,6 +407,13 @@ public class VolumeDataControlUI : NetworkBehaviour
     if (volumeObject != null)
     {
       volumeObject.SetVisibilityWindow(min, max);
+      if (!IsOwner)
+      {
+        // update slider positions for other clients
+        maxVisibilitySlider.value = max;
+        minVisibilitySlider.value = min;
+      }
+
       Debug.Log($"Client {NetworkManager.ClientManager.Connection.ClientId} updated visibility window to min={min}, max={max}.");
     }
   }

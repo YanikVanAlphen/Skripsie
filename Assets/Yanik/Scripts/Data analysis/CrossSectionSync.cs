@@ -51,11 +51,10 @@ public class CrossSectionSync : NetworkBehaviour
 
       if (volumeObject.dataset == null)
       {
-        Debug.Log($"CrossSectionSync: VolumeRenderedObject found but dataset not ready, waiting...");
         yield return new WaitForSeconds(0.5f);
       }
     }
-
+    crossSectionPlane.SetTargetObject(volumeObject);
     lastVolumeScale = volumeObject.transform.localScale;
     UpdatePlaneScale();
     StartCoroutine(CheckVolumeScale());
@@ -110,27 +109,6 @@ public class CrossSectionSync : NetworkBehaviour
       transform.rotation = rotation;
       transform.localScale = scale;
       Debug.Log($"Client updated CrossSectionPlane: Position={position}, Rotation={rotation}, Scale={scale}");
-    }
-  }
-
-  [ServerRpc(RequireOwnership = false)]
-  public void TogglePlaneEnabledServerRpc(bool enabled)
-  {
-    if (crossSectionPlane != null)
-    {
-      crossSectionPlane.enabled = enabled;
-      RpcTogglePlaneEnabled(enabled);
-      Debug.Log($"Server toggled CrossSectionPlane to status: {enabled}.");
-    }
-  }
-
-  [ObserversRpc]
-  private void RpcTogglePlaneEnabled(bool enabled)
-  {
-    if (crossSectionPlane != null)
-    {
-      crossSectionPlane.enabled = enabled;
-      Debug.Log($"Client toggled CrossSectionPlane to status: {enabled}");
     }
   }
 

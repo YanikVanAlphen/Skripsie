@@ -1654,6 +1654,34 @@ namespace Generated
                     ""isPartOfComposite"": false
                 }
             ]
+        },
+        {
+            ""name"": ""XRI RightHand A"",
+            ""id"": ""92fabdab-3d1f-4263-aa1d-ff61f452b24b"",
+            ""actions"": [
+                {
+                    ""name"": ""RightAButton"",
+                    ""type"": ""Button"",
+                    ""id"": ""8671bc01-ef10-4a12-a4ec-cc56c48b5118"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                }
+            ],
+            ""bindings"": [
+                {
+                    ""name"": """",
+                    ""id"": ""7cadbeae-2347-43c1-9e61-80f28fb31705"",
+                    ""path"": ""<XRController>{RightHand}/{PrimaryButton}"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""RightAButton"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                }
+            ]
         }
     ],
     ""controlSchemes"": [
@@ -1780,6 +1808,9 @@ namespace Generated
             // XRI LeftHand X
             m_XRILeftHandX = asset.FindActionMap("XRI LeftHand X", throwIfNotFound: true);
             m_XRILeftHandX_LeftXButton = m_XRILeftHandX.FindAction("LeftXButton", throwIfNotFound: true);
+            // XRI RightHand A
+            m_XRIRightHandA = asset.FindActionMap("XRI RightHand A", throwIfNotFound: true);
+            m_XRIRightHandA_RightAButton = m_XRIRightHandA.FindAction("RightAButton", throwIfNotFound: true);
         }
 
         ~@XRInputActions()
@@ -1793,6 +1824,7 @@ namespace Generated
             UnityEngine.Debug.Assert(!m_XRIRightHandLocomotion.enabled, "This will cause a leak and performance issues, XRInputActions.XRIRightHandLocomotion.Disable() has not been called.");
             UnityEngine.Debug.Assert(!m_XRIUI.enabled, "This will cause a leak and performance issues, XRInputActions.XRIUI.Disable() has not been called.");
             UnityEngine.Debug.Assert(!m_XRILeftHandX.enabled, "This will cause a leak and performance issues, XRInputActions.XRILeftHandX.Disable() has not been called.");
+            UnityEngine.Debug.Assert(!m_XRIRightHandA.enabled, "This will cause a leak and performance issues, XRInputActions.XRIRightHandA.Disable() has not been called.");
         }
 
         /// <summary>
@@ -3124,6 +3156,102 @@ namespace Generated
         /// Provides a new <see cref="XRILeftHandXActions" /> instance referencing this action map.
         /// </summary>
         public XRILeftHandXActions @XRILeftHandX => new XRILeftHandXActions(this);
+
+        // XRI RightHand A
+        private readonly InputActionMap m_XRIRightHandA;
+        private List<IXRIRightHandAActions> m_XRIRightHandAActionsCallbackInterfaces = new List<IXRIRightHandAActions>();
+        private readonly InputAction m_XRIRightHandA_RightAButton;
+        /// <summary>
+        /// Provides access to input actions defined in input action map "XRI RightHand A".
+        /// </summary>
+        public struct XRIRightHandAActions
+        {
+            private @XRInputActions m_Wrapper;
+
+            /// <summary>
+            /// Construct a new instance of the input action map wrapper class.
+            /// </summary>
+            public XRIRightHandAActions(@XRInputActions wrapper) { m_Wrapper = wrapper; }
+            /// <summary>
+            /// Provides access to the underlying input action "XRIRightHandA/RightAButton".
+            /// </summary>
+            public InputAction @RightAButton => m_Wrapper.m_XRIRightHandA_RightAButton;
+            /// <summary>
+            /// Provides access to the underlying input action map instance.
+            /// </summary>
+            public InputActionMap Get() { return m_Wrapper.m_XRIRightHandA; }
+            /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Enable()" />
+            public void Enable() { Get().Enable(); }
+            /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.Disable()" />
+            public void Disable() { Get().Disable(); }
+            /// <inheritdoc cref="UnityEngine.InputSystem.InputActionMap.enabled" />
+            public bool enabled => Get().enabled;
+            /// <summary>
+            /// Implicitly converts an <see ref="XRIRightHandAActions" /> to an <see ref="InputActionMap" /> instance.
+            /// </summary>
+            public static implicit operator InputActionMap(XRIRightHandAActions set) { return set.Get(); }
+            /// <summary>
+            /// Adds <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+            /// </summary>
+            /// <param name="instance">Callback instance.</param>
+            /// <remarks>
+            /// If <paramref name="instance" /> is <c>null</c> or <paramref name="instance"/> have already been added this method does nothing.
+            /// </remarks>
+            /// <seealso cref="XRIRightHandAActions" />
+            public void AddCallbacks(IXRIRightHandAActions instance)
+            {
+                if (instance == null || m_Wrapper.m_XRIRightHandAActionsCallbackInterfaces.Contains(instance)) return;
+                m_Wrapper.m_XRIRightHandAActionsCallbackInterfaces.Add(instance);
+                @RightAButton.started += instance.OnRightAButton;
+                @RightAButton.performed += instance.OnRightAButton;
+                @RightAButton.canceled += instance.OnRightAButton;
+            }
+
+            /// <summary>
+            /// Removes <see cref="InputAction.started"/>, <see cref="InputAction.performed"/> and <see cref="InputAction.canceled"/> callbacks provided via <param cref="instance" /> on all input actions contained in this map.
+            /// </summary>
+            /// <remarks>
+            /// Calling this method when <paramref name="instance" /> have not previously been registered has no side-effects.
+            /// </remarks>
+            /// <seealso cref="XRIRightHandAActions" />
+            private void UnregisterCallbacks(IXRIRightHandAActions instance)
+            {
+                @RightAButton.started -= instance.OnRightAButton;
+                @RightAButton.performed -= instance.OnRightAButton;
+                @RightAButton.canceled -= instance.OnRightAButton;
+            }
+
+            /// <summary>
+            /// Unregisters <param cref="instance" /> and unregisters all input action callbacks via <see cref="XRIRightHandAActions.UnregisterCallbacks(IXRIRightHandAActions)" />.
+            /// </summary>
+            /// <seealso cref="XRIRightHandAActions.UnregisterCallbacks(IXRIRightHandAActions)" />
+            public void RemoveCallbacks(IXRIRightHandAActions instance)
+            {
+                if (m_Wrapper.m_XRIRightHandAActionsCallbackInterfaces.Remove(instance))
+                    UnregisterCallbacks(instance);
+            }
+
+            /// <summary>
+            /// Replaces all existing callback instances and previously registered input action callbacks associated with them with callbacks provided via <param cref="instance" />.
+            /// </summary>
+            /// <remarks>
+            /// If <paramref name="instance" /> is <c>null</c>, calling this method will only unregister all existing callbacks but not register any new callbacks.
+            /// </remarks>
+            /// <seealso cref="XRIRightHandAActions.AddCallbacks(IXRIRightHandAActions)" />
+            /// <seealso cref="XRIRightHandAActions.RemoveCallbacks(IXRIRightHandAActions)" />
+            /// <seealso cref="XRIRightHandAActions.UnregisterCallbacks(IXRIRightHandAActions)" />
+            public void SetCallbacks(IXRIRightHandAActions instance)
+            {
+                foreach (var item in m_Wrapper.m_XRIRightHandAActionsCallbackInterfaces)
+                    UnregisterCallbacks(item);
+                m_Wrapper.m_XRIRightHandAActionsCallbackInterfaces.Clear();
+                AddCallbacks(instance);
+            }
+        }
+        /// <summary>
+        /// Provides a new <see cref="XRIRightHandAActions" /> instance referencing this action map.
+        /// </summary>
+        public XRIRightHandAActions @XRIRightHandA => new XRIRightHandAActions(this);
         private int m_GenericXRControllerSchemeIndex = -1;
         /// <summary>
         /// Provides access to the input control scheme.
@@ -3549,6 +3677,21 @@ namespace Generated
             /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
             /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
             void OnLeftXButton(InputAction.CallbackContext context);
+        }
+        /// <summary>
+        /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "XRI RightHand A" which allows adding and removing callbacks.
+        /// </summary>
+        /// <seealso cref="XRIRightHandAActions.AddCallbacks(IXRIRightHandAActions)" />
+        /// <seealso cref="XRIRightHandAActions.RemoveCallbacks(IXRIRightHandAActions)" />
+        public interface IXRIRightHandAActions
+        {
+            /// <summary>
+            /// Method invoked when associated input action "RightAButton" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+            /// </summary>
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+            /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+            void OnRightAButton(InputAction.CallbackContext context);
         }
     }
 }
