@@ -49,14 +49,6 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private void OnRemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
   {
-    if (args.ConnectionState == RemoteConnectionState.Started)
-    {
-      Debug.Log($"Client {conn.ClientId} connected.");
-      if (dataChunks != null && dataChunks.Length > 0)
-      {
-        StartCoroutine(SendDatasetToClient(conn, dataChunks));
-      }
-    }
     if (args.ConnectionState == RemoteConnectionState.Stopped)
     {
       chunkStorage.Remove(conn);
@@ -200,23 +192,32 @@ public class VolumeDataNetworker : NetworkBehaviour
         Debug.LogError("Client failed to deserialize dataset.");
         yield break;
       }
-
+      
       StartCoroutine(AssignLocalDataset(dataset));
     }
     yield return null;
   }
 
-  private IEnumerator AssignLocalDataset(VolumeDataset dataset = null)
+  private IEnumerator AssignLocalDataset(VolumeDataset dataset)
   {
     if (!IsServer)
     {
       NetworkObject networkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
       var result = VolumeRenderObjectFindUtility.FindVolumeObject("VolumeDataNetworker", networkObject, 0.5f, 60, false); // return the coroutine that will search for the VolumeRenderedObject
-      yield return result; // start coroutine and wait for it to complete
-      volumeObject = result.Current as VolumeRenderedObject; // get current yielded value of coroutine and safely cast it to VolumeRenderedObject type
+
+      while (result.MoveNext())
+      {
+        volumeObject = result.Current as VolumeRenderedObject; // get current yielded value of coroutine and safely cast it to VolumeRenderedObject type
+        if (volumeObject != null)
+          break;
+        yield return null;
+      }
 
       if (volumeObject == null)
+      {
+        Debug.LogError("Returned volumeObject is null");
         yield break;
+      }
     }
     else
     {
@@ -226,6 +227,7 @@ public class VolumeDataNetworker : NetworkBehaviour
         yield break;
       }
     }
+    Debug.Log("Configuring dataset rendering on volumeObject.");
     // create new datasetloader and configure rendering
     datasetLoader = new DataSetLoader();
     yield return datasetLoader.ConfigureVolumeRenderingAsync(volumeObject, dataset);
