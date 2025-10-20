@@ -203,29 +203,14 @@ public class VolumeDataNetworker : NetworkBehaviour
     if (!IsServer)
     {
       NetworkObject networkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
-      var result = VolumeRenderObjectFindUtility.FindVolumeObject("VolumeDataNetworker", networkObject, 0.5f, 60, false); // return the coroutine that will search for the VolumeRenderedObject
-
-      while (result.MoveNext())
-      {
-        volumeObject = result.Current as VolumeRenderedObject; // get current yielded value of coroutine and safely cast it to VolumeRenderedObject type
-        if (volumeObject != null)
-          break;
-        yield return null;
-      }
-
-      if (volumeObject == null)
-      {
-        Debug.LogError("Returned volumeObject is null");
-        yield break;
-      }
+      var result = VolumeRenderObjectFindUtility.FindVolumeObject(caller: "CrossSectionManager", prefab: networkObject, forceReturn: true);
+      yield return result;
+      volumeObject = result.Current as VolumeRenderedObject;
     }
     else
     {
       if (volumeObject == null)
-      {
-        Debug.LogError("Server: VolumeRenderedObject not set.");
         yield break;
-      }
     }
     Debug.Log("Configuring dataset rendering on volumeObject.");
     // create new datasetloader and configure rendering

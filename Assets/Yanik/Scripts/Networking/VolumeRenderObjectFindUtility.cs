@@ -5,7 +5,7 @@ using UnityVolumeRendering;
 
 public static class VolumeRenderObjectFindUtility
 {
-  public static IEnumerator FindVolumeObject(string caller, NetworkObject prefab, float retryInterval = 0.5f, int maxRetries = 120, bool requireDataset = true)
+  public static IEnumerator FindVolumeObject(string caller, NetworkObject prefab, float retryInterval = 0.5f, int maxRetries = 120, bool requireDataset = true, bool forceReturn = false)
   {
     int retryCount = 0;
     VolumeRenderedObject volumeObject = null;
@@ -17,6 +17,7 @@ public static class VolumeRenderObjectFindUtility
     while (volumeObject == null && retryCount < maxRetries)
     {
       NetworkObject[] networkObjectArray = UnityEngine.Object.FindObjectsOfType<NetworkObject>();
+      //NetworkObject[] networkObjectArray = FindObjectsOfType<NetworkObject>();
 
       foreach (NetworkObject currentNetworkObject in networkObjectArray)
       {
@@ -28,13 +29,19 @@ public static class VolumeRenderObjectFindUtility
             yield return volumeObject;
             yield break;
           }
+          if (volumeObject == null && forceReturn)
+          {
+            volumeObject = currentNetworkObject.gameObject.AddComponent<VolumeRenderedObject>(); // client-side will not already have added the component, so add it and return anyways
+            yield return volumeObject;
+            yield break;
+          }
         }
       }
 
       retryCount++;
       yield return new WaitForSeconds(retryInterval);
     }
-    Debug.LogError("Failed to find VolumeRenderedObject, called by: " + caller);
+    Debug.LogWarning("Failed to find VolumeRenderedObject, called by: " + caller);
     yield return null;
   }
 }
