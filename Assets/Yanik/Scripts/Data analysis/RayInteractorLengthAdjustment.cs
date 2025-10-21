@@ -6,89 +6,31 @@ using System.Collections;
 
 public class RayInteractorLengthAdjustment : NetworkBehaviour
 {
-  [SerializeField] private XRBaseInteractor rayInteractor;
-  [SerializeField] private VolumeDataNetworker volumeDataNetworker;
-  [SerializeField] private GameObject rayPrefab;
   [SerializeField] private float defaultRayLength = 2f;
   [SerializeField] private float rayUpdateIntervalTime = 0.1f;
 
   private VolumeRenderedObject volumeObject;
-  private VolumeRaycaster raycaster;
-  private GameObject rayInstance;
+  private VolumeRaycaster raycaster = new VolumeRaycaster();
   private LineRenderer rayLineRenderer;
   private bool isRayActive = false;
 
   private void Awake()
   {
-    raycaster = new VolumeRaycaster();
-    if (rayInteractor == null)
-      rayInteractor = GetComponent<XRBaseInteractor>();
-  }
-
-  public override void OnStartServer()
-  {
-    base.OnStartServer();
-    SpawnRayPrefab();
+    rayLineRenderer = GetComponent<LineRenderer>();
+    rayLineRenderer.positionCount = 2;
+    gameObject.SetActive(false);
   }
 
   public override void OnStartClient()
   {
     base.OnStartClient();
     StartCoroutine(InitVolumeObject());
-    if (!IsServer)
-    {
-      StartCoroutine(FindRayInstance());
-    }
-  }
-
-  private void SpawnRayPrefab()
-  {
-    if (!IsServer)
-      return;
-
-    rayInstance = Instantiate(rayPrefab);
-    rayLineRenderer = rayInstance.GetComponent<LineRenderer>();
-    // define start and end points
-    rayLineRenderer.positionCount = 2;
-    rayInstance.SetActive(false);
-    // spawn pointer ray
-    ServerManager.Spawn(rayInstance, Owner); // spawn with client ownership
-  }
-
-  private IEnumerator FindRayInstance()
-  {
-    int expectedPrefabId = rayPrefab.GetComponent<NetworkObject>().PrefabId;
-    int retryCount = 0;
-    const int maxRetries = 50;
-
-    while (rayInstance == null && retryCount < maxRetries)
-    {
-      NetworkObject[] networkObjectArray = FindObjectsOfType<NetworkObject>();
-      foreach (NetworkObject networkObject in networkObjectArray)
-      {
-        if (networkObject.PrefabId == expectedPrefabId && networkObject.Owner == NetworkManager.ClientManager.Connection)
-        {
-          rayInstance = networkObject.gameObject;
-          rayLineRenderer = rayInstance.GetComponent<LineRenderer>();
-          if (rayLineRenderer != null)
-            break;
-        }
-      }
-      if (rayInstance == null)
-      {
-        retryCount++;
-        yield return new WaitForSeconds(0.2f);
-      }
-    }
-    if (rayInstance == null || rayLineRenderer == null)
-    {
-      Debug.LogError("Client couldnt find ray instance");
-      yield break;
-    }
+    StartCoroutine(UpdateRayLength());
   }
 
   private IEnumerator InitVolumeObject()
   {
+    VolumeDataNetworker volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
     // wait for VolumeDataNetworker to be assigned
     while (volumeDataNetworker == null || volumeDataNetworker.volumeRenderedObjectPrefab == null)
     {
@@ -105,16 +47,11 @@ public class RayInteractorLengthAdjustment : NetworkBehaviour
 
   private IEnumerator UpdateRayLength()
   {
+    XRBaseInteractor rayInteractor = FindObjectOfType<XRBaseInteractor>(); // find right hand controller interactor
     while (true)
     {
       // check if NetworkObject has been initialised before accessing IsOwner
-      if (!IsNetworkObjectInit() || volumeObject == null || rayInteractor == null || rayLineRenderer == null)
-      {
-        yield return new WaitForSeconds(rayUpdateIntervalTime);
-        continue;
-      }
-
-      if (!IsOwner)
+      if (volumeObject == null || rayInteractor == null)
       {
         yield return new WaitForSeconds(rayUpdateIntervalTime);
         continue;
@@ -125,70 +62,38 @@ public class RayInteractorLengthAdjustment : NetworkBehaviour
       Vector3 rayDirection = rayInteractor.transform.forward;
       Ray ray = new Ray(rayOrigin, rayDirection);
       float newDistance = defaultRayLength;
-      Vector3 endPoint = ray.origin + rayDirection * defaultRayLength;
 
       if (isRayActive && raycaster.RaycastScene(ray, out UnityVolumeRendering.RaycastHit hit) && hit.volumeObject == volumeObject)
       {
         newDistance = hit.distance;
-        endPoint = rayOrigin + rayDirection * hit.distance;
       }
 
       if (rayInteractor is XRRayInteractor xrRayInteractor)
       {
         xrRayInteractor.maxRaycastDistance = newDistance;
       }
-
-      if (isRayActive)
-        UpdateRayStateRpc(true, rayOrigin, endPoint);
-      else
-        UpdateRayStateRpc(false, rayOrigin, endPoint);
+      UpdateRayStateRpc(newDistance);
 
       yield return new WaitForSeconds(rayUpdateIntervalTime);
     }
   }
 
   [ObserversRpc]
-  private void UpdateRayStateRpc(bool active, Vector3 start, Vector3 end)
+  private void UpdateRayStateRpc(float distance)
   {
-    if (rayInstance == null || rayLineRenderer == null)
+    if (IsOwner)
       return;
 
-    rayInstance.SetActive(active);
-    if (active)
-    {
-      rayLineRenderer.SetPosition(0, start);
-      rayLineRenderer.SetPosition(1, end);
-    }
+    XRBaseInteractor rayInteractor = FindObjectOfType<XRBaseInteractor>();
+    if (rayInteractor is XRRayInteractor xrRayInteractor)
+      xrRayInteractor.maxRaycastDistance = distance;
   }
 
-  [ServerRpc(RequireOwnership = false)]
+  [ServerRpc(RequireOwnership = true)]
   public void ToggleRayActiveServerRpc(bool active)
   {
     isRayActive = active;
-    Vector3 start = rayInteractor.transform.position;
-    Vector3 end = rayInteractor.transform.position + rayInteractor.transform.forward * defaultRayLength;
-
-    UpdateRayStateRpc(isRayActive, start, end);
-  }
-
-  public bool IsNetworkObjectInit()
-  {
-    var networkObject = GetComponent<NetworkObject>();
-    return networkObject != null && networkObject.IsSpawned;
-  }
-
-  private void Start()
-  {
-    if (volumeDataNetworker == null)
-      volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
-
-    StartCoroutine(InitVolumeObject());
-    StartCoroutine(UpdateRayLength());
-  }
-
-  public void SetVolumeDataNetworker(VolumeDataNetworker networker)
-  {
-    volumeDataNetworker = networker;
+    gameObject.SetActive(active);
   }
 
   public void SetVolumeObject(VolumeRenderedObject volume)
