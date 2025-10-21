@@ -1574,7 +1574,7 @@ PrefabInstance:
         type: 3}
       propertyPath: _playerPrefab
       value: 
-      objectReference: {fileID: 7851710499402613257, guid: ae0d7297a1abbbc4fb86354fa6133759,
+      objectReference: {fileID: 1794872164175970995, guid: 104ac2f48f6312e4bb3f081e808ed030,
         type: 3}
     - target: {fileID: 1420177980032600308, guid: 7328e618e8dc5f84987e09f5e751e875,
         type: 3}
@@ -1930,6 +1930,7 @@ MonoBehaviour:
   <SceneId>k__BackingField: 161435889434369136
   <AssetPathHash>k__BackingField: 0
   _sceneNetworkObjects:
+  - {fileID: 0}
   - {fileID: 1696469370}
   - {fileID: 2120035972}
 --- !u!114 &2120035973
