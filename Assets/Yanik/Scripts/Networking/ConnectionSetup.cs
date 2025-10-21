@@ -57,31 +57,31 @@ public class ConnectionSetup : MonoBehaviour
   private void ClientConnectionState(ClientConnectionStateArgs args)
   {
     Debug.Log($"Client state: {args.ConnectionState}");
-    //if (args.ConnectionState == LocalConnectionState.Started) // client connection started
-    //{
-    //  StartCoroutine(JoinVoiceRoomDelayed());
-    //}
+    if (args.ConnectionState == LocalConnectionState.Started) // client connection started
+    {
+      StartCoroutine(JoinVoiceRoomDelayed());
+    }
   }
 
-  //private IEnumerator JoinVoiceRoomDelayed()
-  //{
-  //  // Wait for server to start and client to have a valid ClientId
-  //  while (!InstanceFinder.ServerManager.Started || InstanceFinder.ClientManager.Connection.ClientId < 0) // [-1] is invalid ID
-  //  {
-  //    yield return new WaitForSeconds(0.1f);
-  //  }
+  private IEnumerator JoinVoiceRoomDelayed()
+  {
+    // Wait for server to start and client to have a valid ClientId
+    while (!InstanceFinder.ServerManager.Started || InstanceFinder.ClientManager.Connection.ClientId < 0) // [-1] is invalid ID
+    {
+      yield return new WaitForSeconds(0.1f);
+    }
 
-  //  VoiceNetwork voiceNetwork = VoiceNetwork.instance;
-  //  try
-  //  {
-  //    voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
-  //    Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
-  //  }
-  //  catch (Exception e)
-  //  {
-  //    Debug.LogError($"Client {InstanceFinder.ClientManager.Connection.ClientId} failed to join chatroom: {e.Message}");
-  //  }
-  //}
+    VoiceNetwork voiceNetwork = VoiceNetwork.instance;
+    try
+    {
+      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
+      Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
+    }
+    catch (Exception e)
+    {
+      Debug.LogError($"Client {InstanceFinder.ClientManager.Connection.ClientId} failed to join chatroom: {e.Message}");
+    }
+  }
 
   private void RemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
   {

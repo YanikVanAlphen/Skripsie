@@ -30,9 +30,7 @@ namespace FishyVoice
 
       // wait for valid Id -> [-1] is invalid
       while (LocalConnection.ClientId < 0)
-      {
         yield return new WaitForSeconds(0.1f);
-      }
 
       try
       {
@@ -58,7 +56,8 @@ namespace FishyVoice
       // everyone joins the room
       try
       {
-        agent.JoinChatroom(chatroomName);
+        voiceNetwork.JoinChatroom(chatroomName); // sync openRooms via ServerRpc
+        agent.JoinChatroom(chatroomName); // routes UniVoice audio
         Debug.Log($"Client {LocalConnection.ClientId} joined chatroom {chatroomName}");
       }
       catch (Exception e)
