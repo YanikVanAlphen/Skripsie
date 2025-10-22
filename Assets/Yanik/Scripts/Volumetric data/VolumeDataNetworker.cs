@@ -30,7 +30,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   private GameObject canvasObject;
   private bool isVolumeSpawned;
   private bool isCanvasSpawned;
-  // Stores dataset chunks for each clients NetworkConnection + used to transmit data to clients joining later.
+  // Stores dataset chunks for each clients NetworkConnection and used to transmit data to clients joining later.
   private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>();
   private byte[][] dataChunks; // Stored chunks for late joining clients
   private DataSetLoader datasetLoader;
@@ -47,28 +47,30 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  private void OnRemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
+  private void OnRemoteConnectionState(NetworkConnection networkConnection, RemoteConnectionStateArgs args)
   {
+    // remove saved client-data entry when a client leaves the session
     if (args.ConnectionState == RemoteConnectionState.Stopped)
     {
-      chunkStorage.Remove(conn);
+      chunkStorage.Remove(networkConnection);
     }
   }
 
   public override void OnStartClient()
   {
+    // when I join as client, request the loaded dataset to be sent to me. Request sent to server to send
     base.OnStartClient();
     if (!IsServer)
       RequestCurrentDatasetServerRpc(NetworkManager.ClientManager.Connection);
   }
 
   [ServerRpc(RequireOwnership = false)]
-  private void RequestCurrentDatasetServerRpc(NetworkConnection conn)
+  private void RequestCurrentDatasetServerRpc(NetworkConnection clientConnection)
   {
     if (isVolumeSpawned && volumeObject != null && dataChunks != null && dataChunks.Length > 0)
     {
-      Debug.Log($"Sending dataset to client {conn.ClientId}.");
-      StartCoroutine(SendDatasetToClient(conn, dataChunks));
+      Debug.Log($"Sending dataset to client {clientConnection.ClientId}.");
+      StartCoroutine(SendDatasetToClient(clientConnection, dataChunks));
     }
   }
 
@@ -126,21 +128,21 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  private IEnumerator SendDatasetToClient(NetworkConnection conn, byte[][] dataChunks)
+  private IEnumerator SendDatasetToClient(NetworkConnection clientConnection, byte[][] dataChunks)
   {
     if (dataChunks == null || dataChunks.Length == 0)
-      yield break;// no chunks to send to client
+      yield break;// no data to send to client
 
     // loop through all chunks and send to client
     for (int i = 0; i < dataChunks.Length; i++)
     {
       if (dataChunks[i] == null || dataChunks[i].Length == 0)
       {
-        Debug.LogError($"Invalid chunk {(i + 1).ToString()}/{dataChunks.Length} for client {conn.ClientId}.");
+        Debug.LogError($"Invalid chunk {(i + 1).ToString()}/{dataChunks.Length} for client {clientConnection.ClientId}.");
         continue;
       }
-      Debug.Log($"Sending chunk {(i + 1).ToString()}/{dataChunks.Length}, size={dataChunks[i].Length} bytes to client {conn.ClientId}");
-      TargetSendDatasetChunk(conn, i, dataChunks.Length, dataChunks[i]);
+      Debug.Log($"Sending chunk {(i + 1).ToString()}/{dataChunks.Length}, size={dataChunks[i].Length} bytes to client {clientConnection.ClientId}");
+      TargetSendDatasetChunk(clientConnection, i, dataChunks.Length, dataChunks[i]);
       // send next chunk after small wait
       yield return new WaitForSeconds(0.1f);
     }
@@ -169,7 +171,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     // get all chunks for the current client
     byte[][] clientChunks = chunkStorage[clientConnection];
 
-    // check if all chunks have been received
+    // check if all chunks have been received to decide whether data can be decompressed, deserialized and rendered yet
     bool allChunksReceived = true;
     foreach (var clientChunk in clientChunks)
     {
@@ -184,7 +186,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     if (allChunksReceived)
     {
       byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[clientConnection]); // uncompress data
-      VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData); // deserialize back into original form before transmission
+      VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData); // deserialize back into original form
       chunkStorage.Remove(clientConnection);
 
       if (dataset == null)
@@ -203,9 +205,11 @@ public class VolumeDataNetworker : NetworkBehaviour
     if (!IsServer)
     {
       NetworkObject networkObject = volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
+      // return coroutine instance to find volumeObject
+      // force return of volumeObject despite the fact that it does not have an attached VolumeRenderedObject component since the client still needs to attach the component after receiving the data
       var result = VolumeRenderObjectFindUtility.FindVolumeObject(caller: "CrossSectionManager", prefab: networkObject, forceReturn: true);
-      yield return result;
-      volumeObject = result.Current as VolumeRenderedObject;
+      yield return result; // pause execution of this coroutine to wait for the VolumeRenderObjectFindUtility to find the volumeObject and therefore yield a result
+      volumeObject = result.Current as VolumeRenderedObject; // safely cast the coroutine result to VolumeRenderedObject type
     }
     else
     {

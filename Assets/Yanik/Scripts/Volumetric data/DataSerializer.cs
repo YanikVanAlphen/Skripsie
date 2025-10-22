@@ -7,27 +7,41 @@ using System.Linq;
 
 public static class DatasetSerializer
 {
+  /* from UnityVolumeRendering source code:
+   * ------------------------------------------------------------------------------------------------------------------------------------------------
+   * Dataset returned from plugin's data loader is an instance of the plugin's custom VolumeDataset class with
+   * description: "An imported dataset. Contains a 3D pixel array of density values."
+   * Public attributes that can be accessed are:
+   * float[] data,
+   * int dimX, dimY, dimZ,
+   * Vector3 scale,
+   * Quaternion rotation,
+   * float volumeScale,
+   * string datasetName,
+   * and then public get/set methods to access scale X,Y,Z but the plugin reccommends using scale itself - declared with the [System.Obsolete()] tag.
+   * ------------------------------------------------------------------------------------------------------------------------------------------------
+   */
   public static byte[] Serialize(VolumeDataset dataset)
   {
     if (dataset == null || dataset.data == null || dataset.data.Length == 0)
     {
-      Debug.LogError("Cant serialize dataset as it is null or empty.");
+      Debug.LogError("Dataset is null or empty.");
       return null;
     }
 
     try
     {
-      Debug.Log($"Serializing dataset: dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}");
+      Debug.Log($"Serializing dataset with dimensions dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}");
       DateTime startTime = DateTime.Now;
 
       byte[] uncompressedData;
       using (MemoryStream stream = new MemoryStream())
       {
-        // int values
+        // sequentially write dimensions (int values)
         WriteInt32(stream, dataset.dimX);
         WriteInt32(stream, dataset.dimY);
         WriteInt32(stream, dataset.dimZ);
-        // float values
+        // sequentially write scale values (floats)
         WriteFloat(stream, dataset.scale.x);
         WriteFloat(stream, dataset.scale.y);
         WriteFloat(stream, dataset.scale.z);
@@ -92,7 +106,7 @@ public static class DatasetSerializer
   {
     if (compressedData == null || compressedData.Length == 0)
     {
-      Debug.LogError("Cant deserialize dataset as it is null or empty.");
+      Debug.LogError("Dataset is null or empty.");
       return null;
     }
 
@@ -119,17 +133,18 @@ public static class DatasetSerializer
       Debug.Log($"Deserializing dataset.");
       startTime = DateTime.Now;
 
-      using (MemoryStream stream = new MemoryStream(decompressedData))
+      using (MemoryStream stream = new MemoryStream(decompressedData)) // BinaryReader does not directly accept byte[] datatypes so best to first convert it to a MemoryStream before reading from it
       using (BinaryReader reader = new BinaryReader(stream)) // reads data in sequence
       {
-        VolumeDataset dataset = ScriptableObject.CreateInstance<VolumeDataset>(); // properly inits the volume data as a scriptableObject to avoid console warning
+        VolumeDataset dataset = ScriptableObject.CreateInstance<VolumeDataset>(); // init the volume data as a scriptableObject to avoid console warnings
+        // read in parameters the same way that we stored them in transmitted data
         dataset.dimX = reader.ReadInt32();
         dataset.dimY = reader.ReadInt32();
         dataset.dimZ = reader.ReadInt32();
         dataset.scale = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
         int dataLength = reader.ReadInt32();
-        dataset.data = new float[dataLength];
 
+        dataset.data = new float[dataLength];
         for (int i = 0; i < dataLength; i++) // rest of data
           dataset.data[i] = reader.ReadSingle();
 
@@ -185,6 +200,7 @@ public static class DatasetSerializer
       }
     }
     byte[] data = new byte[totalLength];
+    
     int offset = 0;
     foreach (byte[] chunk in chunks)
     {

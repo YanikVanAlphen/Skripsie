@@ -25,9 +25,9 @@ public class ConnectionSetup : MonoBehaviour
 
   private void Start()
   {
-    InstanceFinder.ClientManager.OnClientConnectionState += ClientConnectionState; // handle client connecting/disconnecting
-    InstanceFinder.ServerManager.OnServerConnectionState += ServerConnectionState; // handle server-side connection events
-    InstanceFinder.ServerManager.OnRemoteConnectionState += RemoteConnectionState; // handle remote client connection state
+    InstanceFinder.ClientManager.OnClientConnectionState += ClientConnectionState; // client connecting/disconnecting
+    InstanceFinder.ServerManager.OnServerConnectionState += ServerConnectionState; // server-side connection events
+    InstanceFinder.ServerManager.OnRemoteConnectionState += RemoteConnectionState; // remote client connection state
   }
 
   private void ServerConnectionState(ServerConnectionStateArgs args)
@@ -39,10 +39,6 @@ public class ConnectionSetup : MonoBehaviour
     }
   }
 
-  /// <summary>
-  /// Coroutine to create voice comms chat room.
-  /// </summary>
-  /// <returns></returns>
   private IEnumerator CreateVoiceRoomDelayed()
   {
     // wait until the host's client connection is established
@@ -57,30 +53,6 @@ public class ConnectionSetup : MonoBehaviour
   private void ClientConnectionState(ClientConnectionStateArgs args)
   {
     Debug.Log($"Client state: {args.ConnectionState}");
-    if (args.ConnectionState == LocalConnectionState.Started) // client connection started
-    {
-      StartCoroutine(JoinVoiceRoomDelayed());
-    }
-  }
-
-  private IEnumerator JoinVoiceRoomDelayed()
-  {
-    // Wait for server to start and client to have a valid ClientId
-    while (!InstanceFinder.ServerManager.Started || InstanceFinder.ClientManager.Connection.ClientId < 0) // [-1] is invalid ID
-    {
-      yield return new WaitForSeconds(0.1f);
-    }
-
-    VoiceNetwork voiceNetwork = VoiceNetwork.instance;
-    try
-    {
-      voiceNetwork.JoinChatroom(VOICE_ROOM_NAME);
-      Debug.Log($"Client {InstanceFinder.ClientManager.Connection.ClientId} joined chatroom {VOICE_ROOM_NAME}");
-    }
-    catch (Exception e)
-    {
-      Debug.LogError($"Client {InstanceFinder.ClientManager.Connection.ClientId} failed to join chatroom: {e.Message}");
-    }
   }
 
   private void RemoteConnectionState(NetworkConnection conn, RemoteConnectionStateArgs args)
@@ -126,6 +98,7 @@ public class ConnectionSetup : MonoBehaviour
     Debug.Log("Client connection started");
   }
 
+  // (on client-side) get the IP address of host to connect to from text input box, default to default IP if its invalid
   public void SetIPAddress(GameObject ipInputFieldObject)
   {
     if (networkManager == null)

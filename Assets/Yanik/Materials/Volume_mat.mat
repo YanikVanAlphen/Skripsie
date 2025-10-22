@@ -137,10 +137,10 @@ Material:
     - _GlossyReflections: 0
     - _LightingGradientThresholdEnd: 0.15
     - _LightingGradientThresholdStart: 0.02
-    - _MaxVal: 0.9
+    - _MaxVal: 1
     - _Metallic: 0
     - _MinGradient: 0.01
-    - _MinVal: 0.01
+    - _MinVal: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0

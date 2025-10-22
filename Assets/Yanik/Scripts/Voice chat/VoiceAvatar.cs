@@ -22,24 +22,17 @@ namespace FishyVoice
     {
       // wait for VoiceNetwork instance + network to be ready
       while (VoiceNetwork.instance == null || !VoiceNetwork.instance.networkActive)
-      {
         yield return new WaitForSeconds(0.1f);
-      }
-
+      // get created voicenetwork instance now that it is ready
       VoiceNetwork voiceNetwork = VoiceNetwork.instance;
 
-      // wait for valid Id -> [-1] is invalid
+      // wait for valid client Id from FishNet (client instance fully started), [-1] is invalid Id
       while (LocalConnection.ClientId < 0)
         yield return new WaitForSeconds(0.1f);
 
       try
       {
         agent = voiceNetwork.CreateAgent();
-        if (agent == null)
-        {
-          Debug.LogError("Failed to create voice agent");
-          yield break;
-        }
       }
       catch (Exception e)
       {
@@ -47,17 +40,15 @@ namespace FishyVoice
         yield break;
       }
 
-      // wait for the chatroom to exist
+      // wait for the chatroom to be created/exist
       while (!voiceNetwork.openRooms.ContainsKey(chatroomName))
-      {
         yield return new WaitForSeconds(0.1f);
-      }
 
       // everyone joins the room
       try
       {
         voiceNetwork.JoinChatroom(chatroomName); // sync openRooms via ServerRpc
-        agent.JoinChatroom(chatroomName); // routes UniVoice audio
+        agent.JoinChatroom(chatroomName); // route UniVoice audio
         Debug.Log($"Client {LocalConnection.ClientId} joined chatroom {chatroomName}");
       }
       catch (Exception e)
@@ -75,7 +66,7 @@ namespace FishyVoice
       {
         try
         {
-          // safely leave chatroom and free agent
+          // safely try to leave chatroom and free agent
           agent.LeaveChatroom();
           agent.Dispose();
           Debug.Log($"Voice agent disposed for client {LocalConnection.ClientId}.");

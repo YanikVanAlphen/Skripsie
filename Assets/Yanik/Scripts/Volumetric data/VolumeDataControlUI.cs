@@ -73,42 +73,34 @@ public class VolumeDataControlUI : NetworkBehaviour
   private void SetupUI()
   {
     // add listener methods to activate on UI pressed or changed event handlers
-    if (positionIncrementButton != null)
-      positionIncrementButton.onClick.AddListener(OnPositionIncrementClicked);
-    if (positionDecrementButton != null)
-      positionDecrementButton.onClick.AddListener(OnPositionDecrementClicked);
-    if (rotationIncrementButton != null)
-      rotationIncrementButton.onClick.AddListener(OnRotationIncrementClicked);
-    if (rotationDecrementButton != null)
-      rotationDecrementButton.onClick.AddListener(OnRotationDecrementClicked);
-    if (scaleSlider != null)
-      scaleSlider.onValueChanged.AddListener(OnScaleSliderChanged);
-    if (spawnCrossSectionButton != null)
-      spawnCrossSectionButton.onClick.AddListener(OnSpawnCrossSectionButtonClicked);
-    if (minVisibilitySlider != null)
-      minVisibilitySlider.onValueChanged.AddListener(OnVisibilitySlidersChanged);
-    if (maxVisibilitySlider != null)
-      maxVisibilitySlider.onValueChanged.AddListener(OnVisibilitySlidersChanged);
+    // buttons
+    positionIncrementButton.onClick.AddListener(OnPositionIncrementClicked);
+    positionDecrementButton.onClick.AddListener(OnPositionDecrementClicked);
+    rotationIncrementButton.onClick.AddListener(OnRotationIncrementClicked);
+    rotationDecrementButton.onClick.AddListener(OnRotationDecrementClicked);
+    spawnCrossSectionButton.onClick.AddListener(OnSpawnCrossSectionButtonClicked);
+    // sliders
+    scaleSlider.onValueChanged.AddListener(OnScaleSliderChanged);
+    minVisibilitySlider.onValueChanged.AddListener(OnVisibilitySlidersChanged);
+    maxVisibilitySlider.onValueChanged.AddListener(OnVisibilitySlidersChanged); 
   }
 
   private void UpdateInteractableState()
   {
     bool isOwner = IsOwner || IsServer; // IsOwner and IsServer provided directly by FishNet - indicates ownership
     // allow or block anything who isnt owner of canvas from editing
-    if (positionAxisDropdown != null)
-      positionAxisDropdown.interactable = isOwner;
-    if (positionIncrementButton != null)
-      positionIncrementButton.interactable = isOwner;
-    if (positionDecrementButton != null)
-      positionDecrementButton.interactable = isOwner;
-    if (rotationAxisDropdown != null)
-      rotationAxisDropdown.interactable = isOwner;
-    if (rotationIncrementButton != null)
-      rotationIncrementButton.interactable = isOwner;
-    if (rotationDecrementButton != null)
-      rotationDecrementButton.interactable = isOwner;
-    if (scaleSlider != null)
-      scaleSlider.interactable = isOwner;
+    // buttons
+    positionIncrementButton.interactable = isOwner;
+    positionDecrementButton.interactable = isOwner;
+    rotationIncrementButton.interactable = isOwner;
+    rotationDecrementButton.interactable = isOwner;
+    // dropdowns
+    positionAxisDropdown.interactable = isOwner;
+    rotationAxisDropdown.interactable = isOwner;
+    // sliders
+    scaleSlider.interactable = isOwner;   
+    maxVisibilitySlider.interactable = isOwner;
+    minVisibilitySlider.interactable = isOwner;
   }
 
   public override void OnOwnershipClient(NetworkConnection prevOwner) // callback function for when ownership of object changes

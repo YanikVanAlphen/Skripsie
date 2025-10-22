@@ -94,7 +94,7 @@ namespace VolumeData
         }
         else
         {
-          Debug.LogError($"Path is not valid: {fullPath}");
+          Debug.LogError($"Invalid provided path to data");
           return null;
         }
       }
@@ -139,7 +139,7 @@ namespace VolumeData
         var series = importer.LoadSeries(imageFiles); // plugin takes array of image file paths and returns single series of images
         if (series != null && series.Any())
         {
-          dataset = importer.ImportSeries(series.First(), new ImageSequenceImportSettings()); // get first series (usually only has one series)
+          dataset = importer.ImportSeries(series.First(), new ImageSequenceImportSettings()); // get first valid series
         }
       }
       return dataset;
@@ -154,7 +154,7 @@ namespace VolumeData
       if (ini == null)
       {
         Debug.LogWarning("No .ini found for RAW dataset, using defaults.");
-        ini = new DatasetIniData(); // make sure the defaults are set - per default values that plugin gives
+        ini = new DatasetIniData(); // make sure the defaults are set per default values that plugin gives
         ini.dimX = 128;
         ini.dimY = 256;
         ini.dimZ = 256;
@@ -177,8 +177,10 @@ namespace VolumeData
       volumeObject.dataset = dataset;
       Transform volumeContainer = volumeObject.transform.Find("VolumeContainer"); // access VolumeContainer child of VolumeRenderedObject to explicitly set rendering params
 
+      // get max scale in all axes and use that to normalize the data
       float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-      volumeObject.transform.localScale = Vector3.one / maxScale; // normalize scaling in all axes
+      // normalize scaling in all axes
+      volumeObject.transform.localScale = Vector3.one / maxScale;
 
       MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
       Shader volumeShader = Shader.Find(DVRShaderName);
@@ -187,7 +189,10 @@ namespace VolumeData
 
       // generate texture asynchronously
       Texture3D dataTexture = null;
+      // from UnityVolumeRendering plugin: "Gets the 3D data texture, containing the density values of the dataset. Will create the data texture if it does not exist, without blocking the main thread."
+      // null is input since we are not accessing the optional progress handler
       var task = dataset.GetDataTextureAsync(null);
+      // pause execution of this coroutine until the texture is generated using Unity WaitUntil()
       yield return new WaitUntil(() => task.IsCompleted);
       yield return null; // wait an extra frame for Unity's texture processing
 
