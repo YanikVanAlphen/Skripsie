@@ -175,45 +175,51 @@ namespace VolumeData
         yield break;
 
       volumeObject.dataset = dataset;
-      Transform volumeContainer = volumeObject.transform.Find("VolumeContainer"); // access VolumeContainer child of VolumeRenderedObject to explicitly set rendering params
+      // get VolumeContainer child of VolumeRenderedObject to explicitly set rendering params
+      Transform volumeContainer = volumeObject.transform.Find("VolumeContainer");
 
-      // get max scale in all axes and use that to normalize the data
+      // get max scale in all axes and use that to normalise the data
       float maxScale = Mathf.Max(dataset.scale.x, dataset.scale.y, dataset.scale.z);
-      // normalize scaling in all axes
+      // normalise scaling in all axes
       volumeObject.transform.localScale = Vector3.one / maxScale;
 
       MeshRenderer meshRenderer = volumeContainer.GetComponent<MeshRenderer>();
-      Shader volumeShader = Shader.Find(DVRShaderName);
-      if (meshRenderer.sharedMaterial == null || meshRenderer.sharedMaterial.shader != volumeShader) // only create new material if the shader is wrong
-        meshRenderer.sharedMaterial = new Material(volumeShader);
 
-      // generate texture asynchronously
-      Texture3D dataTexture = null;
-      // from UnityVolumeRendering plugin: "Gets the 3D data texture, containing the density values of the dataset. Will create the data texture if it does not exist, without blocking the main thread."
-      // null is input since we are not accessing the optional progress handler
-      var task = dataset.GetDataTextureAsync(null);
-      // pause execution of this coroutine until the texture is generated using Unity WaitUntil()
-      yield return new WaitUntil(() => task.IsCompleted);
-      yield return null; // wait an extra frame for Unity's texture processing
+      // Code below is based on/copy of implementation of the plugin's VolumeObjectFactory.cs. The plugin auto-spawns the volumetric data gameobject,
+      // so this is a customised implementation to generate all textures at runtime and apply it to the pre-configured networked volume data prefab
 
-      dataTexture = task.Result;
-      Debug.Log("Texture generation completed.");
-      meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
-      Debug.Log("Assigned dataset texture to material.");
+      const int noiseDimX = 512;
+      const int noiseDimY = 512;
+      Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
 
-      UnityVolumeRendering.TransferFunction tf = TransferFunctionDatabase.CreateTransferFunction();
-      volumeObject.transferFunction = tf;
-      Texture2D tfTexture = tf.GetTexture();
+      volumeObject.transferFunction = TransferFunctionDatabase.CreateTransferFunction();
+      Texture2D tfTexture = volumeObject.transferFunction.GetTexture();
+
+      meshRenderer.sharedMaterial.SetTexture("_GradientTex", null);
+      meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture);
       meshRenderer.sharedMaterial.SetTexture("_TFTex", tfTexture);
-      Debug.Log("Assigned transfer function texture to material.");
-
-      Texture2D noiseTexture = GenerateNoiseTexture();
-      meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture); // sharedMaterial actually modifies existing material where .material just copies it
-      Debug.Log("Assigned noise texture to material.");
 
       meshRenderer.sharedMaterial.EnableKeyword("MODE_DVR");
       meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
       meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
+
+      volumeContainer.transform.localScale = dataset.scale;
+      volumeContainer.transform.localRotation = dataset.rotation;
+
+      // the plugin uses: meshRenderer.sharedMaterial.SetTexture("_DataTex", await dataset.GetDataTextureAsync(null));
+      // but 'await' is only allowed in a async method
+      // from UnityVolumeRendering plugin's VolumeDataset.cs: "Gets the 3D data texture, containing the density values of the dataset. Will create the data texture if it does not exist, without blocking the main thread."
+      // null input since we are not accessing the optional progress handler
+      var task = dataset.GetDataTextureAsync(null);
+      // pause execution of this coroutine until the texture is generated using Unity WaitUntil()
+      yield return new WaitUntil(() => task.IsCompleted);
+      yield return null; // wait an extra frame before assigning task result to the MeshRenderer
+
+      Texture3D dataTexture = task.Result;
+      Debug.Log("Texture generation completed.");
+      meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
+      Debug.Log("Assigned dataset texture to material.");
+
       volumeObject.meshRenderer = meshRenderer;
 
       /* 
@@ -225,15 +231,8 @@ namespace VolumeData
       */
       volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
       volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
-      volumeObject.UpdateMaterialProperties();
       volumeObject.SetLightingEnabled(true);
-    }
-
-    private Texture2D GenerateNoiseTexture()
-    {
-      const int noiseDimX = 512;
-      const int noiseDimY = 512;
-      return NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
+      volumeObject.UpdateMaterialProperties();
     }
   }
 }
