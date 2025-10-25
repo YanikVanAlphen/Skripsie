@@ -14,7 +14,6 @@ namespace VolumeData
   {
     private readonly string datasetPath;
     private readonly DatasetType dataType;
-    private readonly string DVRShaderName = "VolumeRendering/DirectVolumeRenderingShader";
 
     public DataSetLoader(string dataPath, DatasetType dataType)
     {
