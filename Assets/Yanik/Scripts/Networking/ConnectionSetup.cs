@@ -25,6 +25,7 @@ public class ConnectionSetup : MonoBehaviour
 
   private void Start()
   {
+    // subscribe to Fish-Networking connection state events to print debug console logs to report on server and client events
     InstanceFinder.ClientManager.OnClientConnectionState += ClientConnectionState; // client connecting/disconnecting
     InstanceFinder.ServerManager.OnServerConnectionState += ServerConnectionState; // server-side connection events
     InstanceFinder.ServerManager.OnRemoteConnectionState += RemoteConnectionState; // remote client connection state
@@ -35,14 +36,14 @@ public class ConnectionSetup : MonoBehaviour
     Debug.Log($"Server state: {args.ConnectionState}.");
     if (args.ConnectionState == LocalConnectionState.Started) // successful server start
     {
-      StartCoroutine(CreateVoiceRoomDelayed());
+      StartCoroutine(CreateVoiceRoom());
     }
   }
 
-  private IEnumerator CreateVoiceRoomDelayed()
+  private IEnumerator CreateVoiceRoom()
   {
     // wait until the host's client connection is established
-    while (InstanceFinder.ClientManager.Connection.ClientId == -1) // [-1] is invalid ID
+    while (InstanceFinder.ClientManager.Connection.ClientId == -1) // any ID below 0 is invalid
       yield return new WaitForSeconds(0.1f);
 
     VoiceNetwork voiceNetwork = VoiceNetwork.instance;

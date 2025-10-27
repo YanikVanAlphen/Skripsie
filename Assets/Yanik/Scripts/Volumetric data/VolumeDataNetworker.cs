@@ -18,7 +18,7 @@ using VolumeData;
 public class VolumeDataNetworker : NetworkBehaviour
 {
   // private to other scripts but editable in inspector
-  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host: path to folder or file containing data
+  [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host: path to folder or file containing data in assets folder
   [SerializeField] private DatasetType dataType;
 
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
@@ -39,20 +39,10 @@ public class VolumeDataNetworker : NetworkBehaviour
   {
     if (IsServer)
     {
-      ServerManager.OnRemoteConnectionState += OnRemoteConnectionState; // subscribe OnRemoteConnectionState to trigger when client joins/leaves - FishNet
       if (!isVolumeSpawned)
       {
         StartCoroutine(NetworkVolumeObject());
       }
-    }
-  }
-
-  private void OnRemoteConnectionState(NetworkConnection networkConnection, RemoteConnectionStateArgs args)
-  {
-    // remove saved client-data entry when a client leaves the session
-    if (args.ConnectionState == RemoteConnectionState.Stopped)
-    {
-      chunkStorage.Remove(networkConnection);
     }
   }
 

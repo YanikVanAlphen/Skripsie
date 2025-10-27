@@ -105,17 +105,10 @@ public class VolumeDataControlUI : NetworkBehaviour
 
   public override void OnOwnershipClient(NetworkConnection prevOwner) // callback function for when ownership of object changes
   {
-    base.OnOwnershipClient(prevOwner); // ensure all default ownersip change functions are called
-    UpdateInteractableState(); // update interactible state so that only new owner can interact
-    if (IsOwner && volumeObject != null)
-    {
-      NetworkObject volumeNetworkObject = volumeObject.GetComponent<NetworkObject>();
-      if (volumeNetworkObject != null && volumeNetworkObject.Owner != Owner) // change in ownership
-      {
-        volumeNetworkObject.GiveOwnership(Owner);
-        Debug.Log($"Transferred VolumeRenderedObject ownership to client {Owner.ClientId}.");
-      }
-    }
+    // ensure all default ownersip change functions are called
+    base.OnOwnershipClient(prevOwner);
+    // update interactible state so that only new owner of volumetric data can interact
+    UpdateInteractableState();
   }
 
   private IEnumerator UpdateLabels()

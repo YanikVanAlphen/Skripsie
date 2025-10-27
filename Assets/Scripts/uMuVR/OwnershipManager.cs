@@ -5,10 +5,9 @@ using TriInspector;
 using UltimateXR.Manipulation;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
-// MY EDIT
+// for canvas lookup to be able to use FirstOrDefault function
 using System.Linq;
-using FishNet.Managing.Timing; // Added for TimeManager.Tick
-//
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -38,12 +37,8 @@ namespace uMuVR
 
     [PropertyTooltip("Reference to VolumeDataNetworker to find the canvas")]
     [ShowIf(nameof(enableInteractionTransfer)), PropertyOrder(3)]
+    // ref to VolumeDataNetworker for access to canvas prefab for ownership transfer when a client interacts with the volumedata
     public VolumeDataNetworker volumeDataNetworker = null;
-    private uint lastCanvasTransferTick = 0;
-    private uint lastOwnershipRequestTick = 0;
-    private const uint OWNERSHIP_RETRY_INTERVAL = 10; // Ticks
-    private const uint MAX_RETRIES = 3;
-    private uint ownershipRetryCount = 0;
 
     /// <summary>
     /// Counter tracking how many controllers are actively selecting us
@@ -123,26 +118,10 @@ namespace uMuVR
       if (releaseOwnershipOnLeave)
       {
         GiveOwnership(null);
-        if (volumeDataNetworker != null)
-        {
-          NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
-          int expectedPrefabId = volumeDataNetworker.volumeControlCanvasPrefab?.GetComponent<NetworkObject>()?.PrefabId ?? -1;
-          NetworkObject canvasNetworkObject = null;
-          if (expectedPrefabId != -1)
-          {
-            canvasNetworkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId && nob.GetComponent<VolumeDataControlUI>() != null);
-          }
-
-          if (canvasNetworkObject != null)
-          {
-            canvasNetworkObject.GiveOwnership(null);
-            Debug.Log($"OwnershipManager: Released canvas ownership to scene for client {leaving.ClientId}, ObjectId={canvasNetworkObject.ObjectId}");
-          }
-          else
-          {
-            Debug.LogWarning($"OwnershipManager: Failed to find canvas to release ownership for client {leaving.ClientId}, PrefabId={expectedPrefabId}");
-          }
-        }
+        // find canvas networkobject and then release ownership when owner leaves
+        NetworkObject canvasNO = FindCanvasNetworkObject();
+        if (canvasNO != null)
+          canvasNO.GiveOwnership(null);
       }
     }
 
@@ -157,6 +136,7 @@ namespace uMuVR
         XRIinteractable = GetComponent<XRBaseInteractable>();
       if (enableInteractionTransfer && UXRinteractable == null)
         UXRinteractable = GetComponent<UxrGrabbableObject>();
+      // assign VolumeDataNetworker in the scene if not already set
       if (enableInteractionTransfer && volumeDataNetworker == null)
         volumeDataNetworker = FindObjectOfType<VolumeDataNetworker>();
     }
@@ -169,27 +149,8 @@ namespace uMuVR
       var no = e.interactorObject.transform.GetComponentInParent<NetworkObject>();
       if (no == null) return;
 
-      if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + ownershipTransferCooldown)
-      {
-        Debug.Log($"OwnershipManager: Ownership request skipped due to cooldown for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
-        return;
-      }
-
-      Debug.Log($"OwnershipManager: XR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
-      if (!NetworkObject.IsOwner)
-      {
-        RequestOwnershipServerRpc(no.Owner.ClientId);
-        lastOwnershipRequestTick = NetworkManager.TimeManager.Tick;
-        ownershipRetryCount = 0;
-        InvokeRepeating(nameof(CheckOwnership), 0f, (float)(NetworkManager.TimeManager.TickDelta * OWNERSHIP_RETRY_INTERVAL));
-      }
-      else
-      {
-        Debug.Log($"OwnershipManager: Already owner (ClientId={no.Owner.ClientId}) for {gameObject.name}.");
-      }
-      //TransferCanvasOwnership(no.Owner);
+      GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
       selectionCount++;
-      LogNetworkTransformState();
     }
 
     protected void OnUxrInteractableSelected(object sender, UxrManipulationEventArgs args)
@@ -197,27 +158,8 @@ namespace uMuVR
       var no = args.Grabber.transform.GetComponentInParent<NetworkObject>();
       if (no == null) return;
 
-      if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + ownershipTransferCooldown)
-      {
-        Debug.Log($"OwnershipManager: Ownership request skipped due to cooldown for {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
-        return;
-      }
-
-      Debug.Log($"OwnershipManager: UXR interaction by client {no.Owner.ClientId}, requesting ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}).");
-      if (!NetworkObject.IsOwner)
-      {
-        RequestOwnershipServerRpc(no.Owner.ClientId);
-        lastOwnershipRequestTick = NetworkManager.TimeManager.Tick;
-        ownershipRetryCount = 0;
-        InvokeRepeating(nameof(CheckOwnership), 0f, (float)(NetworkManager.TimeManager.TickDelta * OWNERSHIP_RETRY_INTERVAL));
-      }
-      else
-      {
-        Debug.Log($"OwnershipManager: Already owner (ClientId={no.Owner.ClientId}) for {gameObject.name}.");
-      }
-      //TransferCanvasOwnership(no.Owner);
+      GiveOwnershipWithCooldown(no.Owner, ownershipTransferCooldown, true);
       selectionCount++;
-      LogNetworkTransformState();
     }
 
     /// <summary>
@@ -252,56 +194,33 @@ namespace uMuVR
       ov.RegisterAsListener(this);
     }
 
+    public override void OnOwnershipClient(NetworkConnection prev)
+    {
+      base.OnOwnershipClient(prev);
+      // when client becomes owner of the volumetric data object, transfer canvas ownership to match
+      if (IsOwner && volumeDataNetworker != null)
+      {
+        TransferCanvasOwnership(Owner);
+      }
+    }
+
     private void TransferCanvasOwnership(NetworkConnection newOwner)
     {
-      if (volumeDataNetworker == null)
-      {
-        Debug.LogWarning("OwnershipManager: volumeDataNetworker is null, cannot transfer canvas ownership.");
+      if (newOwner == null)
         return;
-      }
 
-      if (NetworkManager.TimeManager.Tick < lastCanvasTransferTick + ownershipTransferCooldown)
-      {
-        Debug.Log($"OwnershipManager: Canvas ownership transfer skipped due to cooldown for client {newOwner?.ClientId ?? -1}.");
+      NetworkObject canvasNO = FindCanvasNetworkObject();
+      if (canvasNO == null || canvasNO.Owner == newOwner)
         return;
-      }
 
-      NetworkObject canvasNetworkObject = null;
-      int expectedPrefabId = volumeDataNetworker.volumeControlCanvasPrefab?.GetComponent<NetworkObject>()?.PrefabId ?? -1;
-      if (expectedPrefabId != -1)
-      {
-        NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
-        canvasNetworkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId && nob.GetComponent<VolumeDataControlUI>() != null);
-      }
-
-      if (canvasNetworkObject == null)
-      {
-        GameObject canvasGO = GameObject.FindWithTag("VolumeControlCanvas");
-        if (canvasGO != null)
-        {
-          canvasNetworkObject = canvasGO.GetComponent<NetworkObject>();
-        }
-      }
-
-      if (canvasNetworkObject == null)
-      {
-        Debug.LogWarning($"OwnershipManager: Failed to find instantiated canvas with PrefabId={expectedPrefabId} or tag 'VolumeControlCanvas'.");
-        return;
-      }
-
-      if (canvasNetworkObject.Owner != newOwner)
-      {
-        RequestCanvasOwnershipServerRpc(canvasNetworkObject.ObjectId, newOwner);
-        lastCanvasTransferTick = NetworkManager.TimeManager.Tick;
-        Debug.Log($"OwnershipManager: Initiating canvas ownership transfer to client {newOwner?.ClientId ?? -1}.");
-      }
+      RequestCanvasOwnershipServerRpc(canvasNO.ObjectId, newOwner);
     }
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestCanvasOwnershipServerRpc(int canvasObjectId, NetworkConnection newOwner)
     {
       NetworkObject canvasNetworkObject = null;
-      foreach (var nob in FindObjectsOfType<NetworkObject>())
+      foreach (var nob in FindObjectsOfType<NetworkObject>()) // find the canvas' networkObject in the scene by using its object ID
       {
         if (nob.ObjectId == canvasObjectId)
         {
@@ -309,82 +228,37 @@ namespace uMuVR
           break;
         }
       }
-
       if (canvasNetworkObject != null && canvasNetworkObject.Owner != newOwner)
       {
+        // canvas exists + current owner and new owner is different so transfer ownership
         canvasNetworkObject.GiveOwnership(newOwner);
-        Debug.Log($"OwnershipManager: Server granted canvas ownership of ObjectId={canvasObjectId} to client {newOwner?.ClientId ?? -1}.");
-      }
-      else
-      {
-        Debug.LogWarning($"OwnershipManager: Canvas ownership transfer failed for ObjectId={canvasObjectId}. Object {(canvasNetworkObject == null ? "not found" : "already owned by client " + newOwner?.ClientId)}.");
       }
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestOwnershipServerRpc(int clientId)
+    private NetworkObject FindCanvasNetworkObject()
     {
-      NetworkConnection requester = NetworkManager.ServerManager.Clients[clientId];
-      if (requester == null)
+      if (volumeDataNetworker == null || volumeDataNetworker.volumeControlCanvasPrefab == null)
+        return null;
+
+      // get expected prefab ID from the data control menu's prefab to cross reference with IDs of objects in the scene
+      int expectedPrefabId = volumeDataNetworker.volumeControlCanvasPrefab.GetComponent<NetworkObject>().PrefabId;
+      if (expectedPrefabId == -1)
+        return null;
+
+      // get list of NetworkObjects in the scene
+      NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
+      // get the first NetworkObject that matches the expected prefabID
+      NetworkObject canvasNetworkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId && nob.GetComponent<VolumeDataControlUI>() != null);
+
+      // fallback to finding it by name 
+      if (canvasNetworkObject == null)
       {
-        Debug.LogWarning($"OwnershipManager: Ownership request failed for {gameObject.name} (ObjectId={NetworkObject.ObjectId}). Client {clientId} not found.");
-        return;
+        GameObject canvasGameObject = GameObject.FindWithTag("VolumeControlCanvas");
+        if (canvasGameObject != null)
+          canvasNetworkObject = canvasGameObject.GetComponent<NetworkObject>();
       }
 
-      Debug.Log($"RequestOwnershipServerRpc: Called by client {clientId} for {gameObject.name} (ObjectId={NetworkObject.ObjectId})");
-      if (NetworkObject.Owner != requester) // transfer ownership if requester is NOT aleady owner
-      {
-        NetworkObject.GiveOwnership(requester);
-        Debug.Log($"OwnershipManager: Server granted ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) to client {clientId}.");
-      }
-      else
-      {
-        Debug.Log($"OwnershipManager: Ownership request ignored for {gameObject.name} (ObjectId={NetworkObject.ObjectId}). Already owned by client {NetworkObject.Owner.ClientId}.");
-      }
-    }
-
-    private void CheckOwnership()
-    {
-      if (NetworkObject.IsOwner)
-      {
-        Debug.Log($"OwnershipManager: Ownership confirmed for {gameObject.name} (ObjectId={NetworkObject.ObjectId}) by client {NetworkObject.Owner.ClientId}.");
-        CancelInvoke(nameof(CheckOwnership));
-
-        var no = GetComponent<NetworkObject>();
-        if (no != null && no.Owner != null)
-        {
-          TransferCanvasOwnership(no.Owner);
-        }
-        return;
-      }
-
-      if (NetworkManager.TimeManager.Tick < lastOwnershipRequestTick + OWNERSHIP_RETRY_INTERVAL)
-        return;
-
-      if (ownershipRetryCount >= MAX_RETRIES)
-      {
-        Debug.LogError($"OwnershipManager: Failed to gain ownership of {gameObject.name} (ObjectId={NetworkObject.ObjectId}) after {MAX_RETRIES} retries. Check network issues (e.g., VoiceNetwork packet errors).");
-        CancelInvoke(nameof(CheckOwnership));
-        return;
-      }
-
-      Debug.Log($"OwnershipManager: Retrying ownership request for {gameObject.name} (ObjectId={NetworkObject.ObjectId}), attempt {ownershipRetryCount + 1}.");
-      RequestOwnershipServerRpc(NetworkManager.ClientManager.Connection.ClientId);
-      lastOwnershipRequestTick = NetworkManager.TimeManager.Tick;
-      ownershipRetryCount++;
-    }
-
-    private void LogNetworkTransformState()
-    {
-      NetworkTransform nt = GetComponent<NetworkTransform>();
-      if (nt != null)
-      {
-        Debug.Log($"OwnershipManager: NetworkTransform sync state - Position: {nt.transform.position}, Rotation: {nt.transform.rotation.eulerAngles}, Scale: {nt.transform.localScale}, IsOwner: {NetworkObject.IsOwner}");
-      }
-      else
-      {
-        Debug.LogError($"OwnershipManager: NetworkTransform missing on {gameObject.name}!");
-      }
+      return canvasNetworkObject;
     }
 
 #if UNITY_EDITOR
