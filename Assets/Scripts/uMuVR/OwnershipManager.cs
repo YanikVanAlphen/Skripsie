@@ -5,8 +5,6 @@ using TriInspector;
 using UltimateXR.Manipulation;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
-// for canvas lookup to be able to use FirstOrDefault function
-using System.Linq;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -118,10 +116,10 @@ namespace uMuVR
       if (releaseOwnershipOnLeave)
       {
         GiveOwnership(null);
-        // find canvas networkobject and then release ownership when owner leaves
-        NetworkObject canvasNO = FindCanvasNetworkObject();
-        if (canvasNO != null)
-          canvasNO.GiveOwnership(null);
+        // find canvas networkobject and then release ownership when owner leaves similar to how MuVR implements it by assigning ownership to null
+        NetworkObject canvasNetworkObject = FindCanvasNetworkObject();
+        if (canvasNetworkObject != null)
+          canvasNetworkObject.GiveOwnership(null);
       }
     }
 
@@ -194,9 +192,9 @@ namespace uMuVR
       ov.RegisterAsListener(this);
     }
 
-    public override void OnOwnershipClient(NetworkConnection prev)
+    public override void OnOwnershipClient(NetworkConnection prevOwner) // gets called when ownership changes
     {
-      base.OnOwnershipClient(prev);
+      base.OnOwnershipClient(prevOwner);
       // when client becomes owner of the volumetric data object, transfer canvas ownership to match
       if (IsOwner && volumeDataNetworker != null)
       {
@@ -209,25 +207,29 @@ namespace uMuVR
       if (newOwner == null)
         return;
 
-      NetworkObject canvasNO = FindCanvasNetworkObject();
-      if (canvasNO == null || canvasNO.Owner == newOwner)
+      NetworkObject canvasNetworkObject = FindCanvasNetworkObject();
+      // only want to act on ownership change if the owners actually switch/ there is a new owner
+      if (canvasNetworkObject == null || canvasNetworkObject.Owner == newOwner)
         return;
 
-      RequestCanvasOwnershipServerRpc(canvasNO.ObjectId, newOwner);
+      RequestCanvasOwnershipServerRpc(canvasNetworkObject.ObjectId, newOwner);
     }
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestCanvasOwnershipServerRpc(int canvasObjectId, NetworkConnection newOwner)
     {
       NetworkObject canvasNetworkObject = null;
-      foreach (var nob in FindObjectsOfType<NetworkObject>()) // find the canvas' networkObject in the scene by using its object ID
+      // find the canvas' networkObject in the scene by using its object ID
+      NetworkObject[] networkObjectArray = FindObjectsOfType<NetworkObject>();
+      foreach (var networkObject in networkObjectArray) 
       {
-        if (nob.ObjectId == canvasObjectId)
+        if (networkObject.ObjectId == canvasObjectId)
         {
-          canvasNetworkObject = nob;
+          canvasNetworkObject = networkObject;
           break;
         }
       }
+
       if (canvasNetworkObject != null && canvasNetworkObject.Owner != newOwner)
       {
         // canvas exists + current owner and new owner is different so transfer ownership
@@ -240,22 +242,22 @@ namespace uMuVR
       if (volumeDataNetworker == null || volumeDataNetworker.volumeControlCanvasPrefab == null)
         return null;
 
-      // get expected prefab ID from the data control menu's prefab to cross reference with IDs of objects in the scene
+      // get expected prefab ID from the data control menu prefab's NetworkObject to cross reference with IDs of objects in the scene
       int expectedPrefabId = volumeDataNetworker.volumeControlCanvasPrefab.GetComponent<NetworkObject>().PrefabId;
-      if (expectedPrefabId == -1)
+      if (expectedPrefabId == -1) // [-1] is invalid ID
         return null;
 
       // get list of NetworkObjects in the scene
       NetworkObject[] networkObjects = FindObjectsOfType<NetworkObject>();
       // get the first NetworkObject that matches the expected prefabID
-      NetworkObject canvasNetworkObject = networkObjects.FirstOrDefault(nob => nob.PrefabId == expectedPrefabId && nob.GetComponent<VolumeDataControlUI>() != null);
-
-      // fallback to finding it by name 
-      if (canvasNetworkObject == null)
+      NetworkObject canvasNetworkObject = null;
+      foreach (var networkObject in networkObjects)
       {
-        GameObject canvasGameObject = GameObject.FindWithTag("VolumeControlCanvas");
-        if (canvasGameObject != null)
-          canvasNetworkObject = canvasGameObject.GetComponent<NetworkObject>();
+        if (networkObject.PrefabID = expectedPrefabId && networkObject.GetComponent<VolumeDataControlUI>() != null)
+        {
+          canvasNetworkObject = networkObject;
+          break;
+        }
       }
 
       return canvasNetworkObject;
