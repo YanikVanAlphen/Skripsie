@@ -253,7 +253,7 @@ namespace uMuVR
       NetworkObject canvasNetworkObject = null;
       foreach (var networkObject in networkObjects)
       {
-        if (networkObject.PrefabID = expectedPrefabId && networkObject.GetComponent<VolumeDataControlUI>() != null)
+        if (networkObject.PrefabId == expectedPrefabId && networkObject.GetComponent<VolumeDataControlUI>() != null)
         {
           canvasNetworkObject = networkObject;
           break;

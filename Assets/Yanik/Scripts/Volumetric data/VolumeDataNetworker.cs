@@ -17,9 +17,9 @@ using VolumeData;
 
 public class VolumeDataNetworker : NetworkBehaviour
 {
-  // private to other scripts but editable in inspector
+  // [SerializeField] attribute marks variables as private to other scripts but still editable in inspector UI
   [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host: path to folder or file containing data in assets folder
-  [SerializeField] private DatasetType dataType;
+  [SerializeField] private DatasetType dataType; // public enum defined by UnityVolumeRendering plugin that lists all data types that can be imported. displayed as a dropdown menu in inspector
 
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
