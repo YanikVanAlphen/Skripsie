@@ -37,7 +37,7 @@ public class VolumeDataNetworker : NetworkBehaviour
 
   private void Start()
   {
-    if (IsServer)
+    if (IsServer) // Only server should spawn the volumetric data
     {
       if (!isVolumeSpawned)
       {

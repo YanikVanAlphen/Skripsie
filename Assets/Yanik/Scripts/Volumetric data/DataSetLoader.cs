@@ -170,6 +170,10 @@ namespace VolumeData
 
     public IEnumerator ConfigureVolumeRenderingAsync(VolumeRenderedObject volumeObject, VolumeDataset dataset)
     {
+      // variables for logging rendering times
+      DateTime startTime;
+      DateTime endTime;
+
       if (volumeObject == null || dataset == null)
         yield break;
 
@@ -186,13 +190,18 @@ namespace VolumeData
 
       // Code below is based on/copy of implementation of the plugin's VolumeObjectFactory.cs. The plugin auto-spawns the volumetric data gameobject,
       // so this is a customised implementation to generate all textures at runtime and apply it to the pre-configured networked volume data prefab
-
+      startTime = DateTime.Now;
       const int noiseDimX = 512;
       const int noiseDimY = 512;
       Texture2D noiseTexture = NoiseTextureGenerator.GenerateNoiseTexture(noiseDimX, noiseDimY);
+      endTime = DateTime.Now;
+      TimeSpan noiseTexGenDuration = endTime - startTime;
 
+      startTime = DateTime.Now;
       volumeObject.transferFunction = TransferFunctionDatabase.CreateTransferFunction();
       Texture2D tfTexture = volumeObject.transferFunction.GetTexture();
+      endTime = DateTime.Now;
+      TimeSpan tfTexGenDuration = endTime - startTime;
 
       meshRenderer.sharedMaterial.SetTexture("_GradientTex", null);
       meshRenderer.sharedMaterial.SetTexture("_NoiseTex", noiseTexture);
@@ -205,6 +214,7 @@ namespace VolumeData
       volumeContainer.transform.localScale = dataset.scale;
       volumeContainer.transform.localRotation = dataset.rotation;
 
+      startTime = DateTime.Now;
       // the plugin uses: meshRenderer.sharedMaterial.SetTexture("_DataTex", await dataset.GetDataTextureAsync(null));
       // but 'await' is only allowed in a async method
       // from UnityVolumeRendering plugin's VolumeDataset.cs: "Gets the 3D data texture, containing the density values of the dataset. Will create the data texture if it does not exist, without blocking the main thread."
@@ -213,12 +223,14 @@ namespace VolumeData
       // pause execution of this coroutine until the texture is generated using Unity WaitUntil()
       yield return new WaitUntil(() => task.IsCompleted);
       yield return null; // wait an extra frame before assigning task result to the MeshRenderer
-
       Texture3D dataTexture = task.Result;
       Debug.Log("Texture generation completed.");
+      endTime = DateTime.Now;
+      TimeSpan dataTexGenDuration = endTime - startTime;
+
       meshRenderer.sharedMaterial.SetTexture("_DataTex", dataTexture);
       Debug.Log("Assigned dataset texture to material.");
-
+      // apply meshrenderer to the volumeobject's meshrenderer
       volumeObject.meshRenderer = meshRenderer;
 
       /* 
@@ -231,7 +243,16 @@ namespace VolumeData
       volumeObject.SetRenderMode(UnityVolumeRendering.RenderMode.DirectVolumeRendering);
       volumeObject.SetVisibilityWindow(new Vector2(0.01f, 0.9f));
       volumeObject.SetLightingEnabled(true);
+      startTime = DateTime.Now;
       volumeObject.UpdateMaterialProperties();
+      endTime = DateTime.Now;
+      TimeSpan materialPropertiesUpdateDuration = endTime - startTime;
+
+      Debug.Log("Render setup complete, logging times below");
+      Debug.Log($"Noise texture generation took {noiseTexGenDuration.TotalSeconds} seconds");
+      Debug.Log($"Transfer function creation took {tfTexGenDuration.TotalSeconds} seconds");
+      Debug.Log($"Data texture generation took {dataTexGenDuration.TotalSeconds} seconds");
+      Debug.Log($"Updating material properties took {materialPropertiesUpdateDuration.TotalSeconds} seconds");
     }
   }
 }
