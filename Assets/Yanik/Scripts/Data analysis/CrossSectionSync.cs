@@ -24,7 +24,7 @@ public class CrossSectionSync : NetworkBehaviour
     }
   }
 
-  public override void OnStartClient()
+  public override void OnStartClient() // from Fish-Networking, runs when client instance starts for late joiners
   {
     base.OnStartClient();
     crossSectionPlane = GetComponent<CrossSectionPlane>();

@@ -138,13 +138,11 @@ public class VolumeDataNetworker : NetworkBehaviour
     }
   }
 
-  [TargetRpc] // RPC used to run logic on a specific target client. conn is the client to target/connection the data is going to
+  [TargetRpc] // RPC used to run logic on a specific target client. conn is the client to target/connection the data is going to/the client to run logic on
   private void TargetSendDatasetChunk(NetworkConnection conn, int chunkIndex, int totalChunks, byte[] chunk)
   {
-    if (!IsServer)
-    {
-      StartCoroutine(ReceiveDatasetChunk(chunkIndex, totalChunks, chunk));
-    }
+    //if (!IsServer)
+    StartCoroutine(ReceiveDatasetChunk(chunkIndex, totalChunks, chunk));
   }
 
   private IEnumerator ReceiveDatasetChunk(int chunkIndex, int totalChunks, byte[] chunk)
@@ -153,6 +151,7 @@ public class VolumeDataNetworker : NetworkBehaviour
     // if the client networkconnection does not already exist as a key in the chunkstorage dictionary, make a new space for it.
     if (!chunkStorage.ContainsKey(clientConnection))
     {
+      // make space for totalChunks number of transmitted chunks
       chunkStorage[clientConnection] = new byte[totalChunks][];
     }
     chunkStorage[clientConnection][chunkIndex] = chunk;
@@ -172,11 +171,11 @@ public class VolumeDataNetworker : NetworkBehaviour
       }
     }
 
-    // only uncompress and deserialize chunks when the full dataset has been received by client
+    // only decompress and deserialize chunks when the full dataset has been received by client i.e. no chunk is null
     if (allChunksReceived)
     {
-      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[clientConnection]); // uncompress data
-      VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData); // deserialize back into original form
+      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[clientConnection]); // combine chunks back into 1D byte array
+      VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData); // decompress and deserialize data back into original form
       chunkStorage.Remove(clientConnection);
 
       if (dataset == null)

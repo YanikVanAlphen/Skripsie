@@ -51,8 +51,6 @@ public class CrossSectionManager : NetworkBehaviour
     var result = VolumeRenderObjectFindUtility.FindVolumeObject("CrossSectionManager", networkObject);
     yield return result;
     volumeObject = result.Current as VolumeRenderedObject;
-    if (volumeObject != null)
-      Debug.Log($"CrossSectionManager: Found VolumeRenderedObject");
   }
 
   [ServerRpc(RequireOwnership = false)]
@@ -67,13 +65,13 @@ public class CrossSectionManager : NetworkBehaviour
     // Configure plane components
     var planeComponent = plane.GetComponent<CrossSectionPlane>();
     if (planeComponent != null)
-      planeComponent.SetTargetObject(volumeObject);
+      planeComponent.SetTargetObject(volumeObject); // from UnityVolumeRendering: set cross section plane target so that the plane interacts correctly with the data
 
     var syncComponent = plane.GetComponent<CrossSectionSync>();
     if (syncComponent != null)
       syncComponent.SetVolumeObject(volumeObject);
 
-    var ownershipManager = plane.GetComponent<OwnershipManager>();
+    //var ownershipManager = plane.GetComponent<OwnershipManager>();
 
     ServerManager.Spawn(plane);
 

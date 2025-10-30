@@ -252,7 +252,7 @@ namespace VolumeData
       Debug.Log($"Noise texture generation took {noiseTexGenDuration.TotalSeconds} seconds");
       Debug.Log($"Transfer function creation took {tfTexGenDuration.TotalSeconds} seconds");
       Debug.Log($"Data texture generation took {dataTexGenDuration.TotalSeconds} seconds");
-      Debug.Log($"Updating material properties took {materialPropertiesUpdateDuration.TotalSeconds} seconds");
+      Debug.Log($"Updating material properties took {materialPropertiesUpdateDuration.TotalSeconds} seconds / {materialPropertiesUpdateDuration.TotalMilliseconds} milliseconds");
     }
   }
 }

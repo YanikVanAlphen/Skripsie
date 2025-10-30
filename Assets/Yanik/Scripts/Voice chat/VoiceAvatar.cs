@@ -30,32 +30,16 @@ namespace FishyVoice
       while (LocalConnection.ClientId < 0)
         yield return new WaitForSeconds(0.1f);
 
-      try
-      {
-        agent = voiceNetwork.CreateAgent();
-      }
-      catch (Exception e)
-      {
-        Debug.LogError($"Error creating agent: {e.Message}");
-        yield break;
-      }
+      agent = voiceNetwork.CreateAgent();
 
       // wait for the chatroom to be created/exist
       while (!voiceNetwork.openRooms.ContainsKey(chatroomName))
         yield return new WaitForSeconds(0.1f);
 
       // everyone joins the room
-      try
-      {
-        voiceNetwork.JoinChatroom(chatroomName); // sync openRooms via ServerRpc
-        agent.JoinChatroom(chatroomName); // route UniVoice audio
-        Debug.Log($"Client {LocalConnection.ClientId} joined chatroom {chatroomName}");
-      }
-      catch (Exception e)
-      {
-        Debug.LogError($"Error joining chatroom: {e.Message}");
-        yield break;
-      }
+      voiceNetwork.JoinChatroom(chatroomName); // sync openRooms via ServerRpc
+      agent.JoinChatroom(chatroomName); // route UniVoice audio
+      Debug.Log($"Client {LocalConnection.ClientId} joined chatroom {chatroomName}");
     }
 
     public override void OnStopClient()
@@ -73,7 +57,7 @@ namespace FishyVoice
         }
         catch (Exception e)
         {
-          Debug.LogError($"Failed to dispose voice agent: {e.Message}");
+          Debug.LogError(e.Message);
         }
         agent = null;
       }

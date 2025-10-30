@@ -227,7 +227,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 4
+  _componentIndexCache: 3
   _addedNetworkObject: {fileID: 1794872164175970995}
   _networkObjectCache: {fileID: 1794872164175970995}
   _synchronizeParent: 0
@@ -301,7 +301,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e269b32501e58ec45a8196a2c8ce781c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 5
+  _componentIndexCache: 4
   _addedNetworkObject: {fileID: 1794872164175970995}
   _networkObjectCache: {fileID: 1794872164175970995}
   target: {fileID: 1163437542707720213}
@@ -368,7 +368,6 @@ MonoBehaviour:
   - {fileID: 1186324761526517472}
   - {fileID: 6221807822439525834}
   - {fileID: 6797545233244845822}
-  - {fileID: 0}
   - {fileID: 6559299610378953594}
   - {fileID: 3744744497801388851}
   - {fileID: 842498008809553249}
@@ -684,7 +683,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 6
+  _componentIndexCache: 5
   _addedNetworkObject: {fileID: 1794872164175970995}
   _networkObjectCache: {fileID: 1794872164175970995}
   _synchronizeParent: 0
@@ -758,7 +757,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e269b32501e58ec45a8196a2c8ce781c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 7
+  _componentIndexCache: 6
   _addedNetworkObject: {fileID: 1794872164175970995}
   _networkObjectCache: {fileID: 1794872164175970995}
   target: {fileID: 4775038572324358031}
@@ -872,7 +871,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 8
+  _componentIndexCache: 7
   _addedNetworkObject: {fileID: 1794872164175970995}
   _networkObjectCache: {fileID: 1794872164175970995}
   _synchronizeParent: 0
@@ -946,7 +945,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e269b32501e58ec45a8196a2c8ce781c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 9
+  _componentIndexCache: 8
   _addedNetworkObject: {fileID: 1794872164175970995}
   _networkObjectCache: {fileID: 1794872164175970995}
   target: {fileID: 7099239744617481649}
@@ -1073,7 +1072,7 @@ PrefabInstance:
     - target: {fileID: -8679921383154817045, guid: e503208d2d7d84543a7fd0824abe67fd,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e503208d2d7d84543a7fd0824abe67fd,
         type: 3}
@@ -1225,7 +1224,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2836e36774ca1c4bbbee976e17b649c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _componentIndexCache: 10
+  _componentIndexCache: 9
   _addedNetworkObject: {fileID: 1794872164175970995}
   _networkObjectCache: {fileID: 1794872164175970995}
   _synchronizeParent: 0
@@ -1262,7 +1261,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2547453424004638067}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b2d8418b0b9634b1892b0268dd9c2743, type: 3}
   m_Name: 

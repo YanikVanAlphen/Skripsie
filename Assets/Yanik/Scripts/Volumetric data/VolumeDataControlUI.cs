@@ -64,9 +64,9 @@ public class VolumeDataControlUI : NetworkBehaviour
     if (volumeDataNetworker != null && volumeDataNetworker.volumeRenderedObjectPrefab != null)
     {
       NetworkObject networkObject = volumeDataNetworker.volumeRenderedObjectPrefab.GetComponent<NetworkObject>();
-      var result = VolumeRenderObjectFindUtility.FindVolumeObject("VolumeDataControlUI", networkObject);
-      yield return result;
-      volumeObject = result.Current as VolumeRenderedObject;
+      var result = VolumeRenderObjectFindUtility.FindVolumeObject("VolumeDataControlUI", networkObject); // return instance of coroutine
+      yield return result; // pause execution of FindVolumeObject() until the coroutine yields its first result / finds the volumeObject
+      volumeObject = result.Current as VolumeRenderedObject; // safely cast the result to VolumeRenderedObject type without error if it returns null
     }
   }
 
@@ -315,8 +315,6 @@ public class VolumeDataControlUI : NetworkBehaviour
     if (volumeObject == null)
       return;
 
-    Debug.Log("Requested spawn of CrossSectionPlane.");
-
     if (spawnCrossSectionButton != null)
       spawnCrossSectionButton.interactable = false; // disable to prevent double-click spawning
 
@@ -356,7 +354,11 @@ public class VolumeDataControlUI : NetworkBehaviour
     if (volumeObject != null)
     {
       volumeObject.transform.localScale = new Vector3(scale, scale, scale);
-      Debug.Log($"Client {NetworkManager.ClientManager.Connection.ClientId} updated scale to {scale}.");
+      if (!IsOwner)
+      {
+        // update slider position for all other clients
+        scaleSlider.value = scale;
+      }
     }
   }
 
