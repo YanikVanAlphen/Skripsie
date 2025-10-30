@@ -44,6 +44,31 @@ public class VolumeDataNetworker : NetworkBehaviour
         StartCoroutine(NetworkVolumeObject());
       }
     }
+    StartCoroutine(TrackFramerate());
+  }
+
+  private IEnumerator TrackFramerate()
+  {
+    float loggingInterval = 5f;
+    float timeElapsed, intervalStart, averageFPS;
+    int frameCount = 0;
+    while (true)
+    {
+      // reset values for new interval
+      timeElapsed = 0f;
+      frameCount = 0;
+      intervalStart = Time.unscaledTime;
+
+      while (timeElapsed < loggingInterval)
+      {
+        frameCount++;
+        timeElapsed = Time.unscaledTime - intervalStart;
+        // wait one frame
+        yield return null;
+      }
+      averageFPS = frameCount / timeElapsed;
+      Debug.Log($"Average FPS for the last {loggingInterval} seconds is {averageFPS:F2}.");
+    }
   }
 
   public override void OnStartClient()
