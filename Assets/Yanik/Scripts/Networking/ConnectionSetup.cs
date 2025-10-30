@@ -36,8 +36,20 @@ public class ConnectionSetup : MonoBehaviour
     Debug.Log($"Server state: {args.ConnectionState}.");
     if (args.ConnectionState == LocalConnectionState.Started) // successful server start
     {
+      StartCoroutine(WaitForStart());
       StartCoroutine(CreateVoiceRoom());
     }
+  }
+
+  private IEnumerator WaitForStart()
+  {
+    // FishNetworkings NetworkManager provides public ServerManager.Started boolean that FishNetworking sets to true if server is active
+    // wait until server is active
+    while (!networkManager.ServerManager.Started)
+      yield return null;
+    // found experimentally that waiting another frame before attempting to join as client does the trick
+    yield return null;
+    StartClient();
   }
 
   private IEnumerator CreateVoiceRoom()
@@ -82,7 +94,9 @@ public class ConnectionSetup : MonoBehaviour
     tugboat.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4); // config server to accept connections from any IP
     tugboat.SetPort(portNumber);
     StartServer();
-    StartClient();
+    // for larger datasets that take longer to load, the server is not yet fully started before the client wants to connect.
+    // move StartClient() for host-client to existing listener method that triggers when server starts/stops
+    //StartClient();
   }
 
   public void StartServer()
