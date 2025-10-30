@@ -27,7 +27,6 @@ The scene, scripts, prefabs and materials created for this project can be found 
 ```
 └── Assets/
     ├── EasyVolumeRendering
-    │   └── detect/
     ├── FishNet
     ├── ...
     └── Yanik
