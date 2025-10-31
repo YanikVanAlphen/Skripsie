@@ -7,7 +7,9 @@
 [uMuVR] is a [Unity] framework that provides a foundation for multiuser/player VR experiences. Its networking is provided by the [Fish-Networking] library. It is primarily designed around allowing users to quickly create VR applications. 
 [Fish-Networking]'s documentation can be found here: https://fish-networking.gitbook.io/docs/
 The journal paper for uMuVR can be found here: https://isca-hq.org/Documents/Journal/Archive/2023/2023volume3001/2023volume300104.pdf
+
 Additional setup information about uMuVR can be found either in their Git repo or in the `README.md` of this repo's `MuVR` branch.
+
 ## Setup
 Below is the setup instructions as given by [uMuVR]:
 
