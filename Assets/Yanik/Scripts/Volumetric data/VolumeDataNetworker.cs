@@ -14,12 +14,21 @@ using System;
 using System.Collections.Generic;
 using System.Collections;
 using VolumeData;
+using TriInspector;
 
 public class VolumeDataNetworker : NetworkBehaviour
 {
   // [SerializeField] attribute marks variables as private to other scripts but still editable in inspector UI
   [SerializeField] private string datasetPath = "EasyVolumeRendering/DataFiles/VisMale.raw"; // Only used by host: path to folder or file containing data in assets folder
   [SerializeField] private DatasetType dataType; // public enum defined by UnityVolumeRendering plugin that lists all data types that can be imported. displayed as a dropdown menu in inspector
+  
+  // Let user specify what the dimensions etc are if they load in a raw file to use the correct defaults
+  [ShowIf("isRawSelected")] public int dimX = 128;
+  [ShowIf("isRawSelected")] public int dimY = 256;
+  [ShowIf("isRawSelected")] public int dimZ = 256;
+  [ShowIf("isRawSelected")] public int bytesToSkip = 0;
+  [ShowIf("isRawSelected")] public DataContentFormat format = DataContentFormat.Uint8;
+  [ShowIf("isRawSelected")] public Endianness endianness = Endianness.LittleEndian;
 
   [SerializeField] private Vector3 defaultPosition = new Vector3(0f, 5.0f, 0f);
   [SerializeField] private Quaternion defaultRotation = Quaternion.Euler(90f, 0f, 0f);
@@ -34,6 +43,12 @@ public class VolumeDataNetworker : NetworkBehaviour
   private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>();
   private byte[][] dataChunks; // Stored chunks for late joining clients
   private DataSetLoader datasetLoader;
+
+  private bool isRawSelected()
+  {
+    // called by ShowIf attribute to determine whether or not to show the RAW defaults in inspector
+    return dataType == DatasetType.Raw;
+  }
 
   private void Start()
   {
@@ -95,7 +110,7 @@ public class VolumeDataNetworker : NetworkBehaviour
       yield break;
 
     // create new datasetLoader, load data in and prep for transmission
-    datasetLoader = new DataSetLoader(datasetPath, dataType);
+    datasetLoader = new DataSetLoader(datasetPath, dataType, dimX, dimY, dimZ, bytesToSkip, format, endianness);
     VolumeDataset dataset = datasetLoader.LoadDataset();
     dataChunks = PrepareDataForTransmit(datasetPath, dataset);
     Debug.Log($"Volumetric data ready for transmission.");

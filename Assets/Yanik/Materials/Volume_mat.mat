@@ -137,10 +137,10 @@ Material:
     - _GlossyReflections: 0
     - _LightingGradientThresholdEnd: 0.15
     - _LightingGradientThresholdStart: 0.02
-    - _MaxVal: 1
+    - _MaxVal: 0.9
     - _Metallic: 0
     - _MinGradient: 0.01
-    - _MinVal: 0.01133729
+    - _MinVal: 0.01
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueOffset: 0
@@ -160,5 +160,5 @@ Material:
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowVolumeTextureSize: {r: 512, g: 512, b: 512, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TextureSize: {r: 128, g: 256, b: 256, a: 0}
+    - _TextureSize: {r: 512, g: 512, b: 140, a: 0}
   m_BuildTextureStacks: []

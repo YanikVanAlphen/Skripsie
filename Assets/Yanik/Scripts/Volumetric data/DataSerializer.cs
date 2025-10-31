@@ -33,6 +33,7 @@ public static class DatasetSerializer
     {
       Debug.Log($"Serializing dataset with dimensions dimX={dataset.dimX}, dimY={dataset.dimY}, dimZ={dataset.dimZ}");
       DateTime startTime = DateTime.Now;
+      int zeroCount = 0;
 
       byte[] uncompressedData;
       using (MemoryStream stream = new MemoryStream())
@@ -51,6 +52,8 @@ public static class DatasetSerializer
 
         foreach (float value in data)
         {
+          if (value <= 1e-5)
+            zeroCount++;
           WriteFloat(stream, value);
         }
         // make sure all data is fully written to stream before doing anything further
@@ -60,7 +63,10 @@ public static class DatasetSerializer
       }
       DateTime endTime = DateTime.Now;
       TimeSpan duration = endTime - startTime;
+      int dataLength = dataset.data.Length;
+      float sparsity = 100*(float)zeroCount/dataLength;
       Debug.Log($"Serialization took {duration.TotalSeconds} seconds.");
+      Debug.Log($"Data sparsity: {sparsity}%");
       Debug.Log($"Data size before compression: {uncompressedData.Length / 1024f / 1024f:F2} MB"); // convert size from bytes to megabytes
       startTime = DateTime.Now;
       // compress the data

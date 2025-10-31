@@ -717,7 +717,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 9.1835e-41, y: 1.1681478e-37, z: 9.78048e-39, w: NaN}
+  m_BoundingSphereOverride: {x: 6.94e-43, y: 2.51e-43, z: 0, w: -7.6125575e+32}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
@@ -1947,8 +1947,14 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 2120035972}
   _networkObjectCache: {fileID: 2120035972}
-  datasetPath: EasyVolumeRendering/DataFiles/vismale.raw
-  dataType: 1
+  datasetPath: EasyVolumeRendering/DataFiles/teneData/abdomen_2/
+  dataType: 2
+  dimX: 256
+  dimY: 256
+  dimZ: 256
+  bytesToSkip: 0
+  format: 1
+  endianness: 0
   defaultPosition: {x: 0, y: 0, z: 0}
   defaultRotation: {x: 0, y: 0, z: 0, w: 1}
   volumeRenderedObjectPrefab: {fileID: 687899278494396546, guid: de632d9d963a5a946820d266937fae6d,

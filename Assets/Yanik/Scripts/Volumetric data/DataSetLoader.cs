@@ -15,10 +15,21 @@ namespace VolumeData
     private readonly string datasetPath;
     private readonly DatasetType dataType;
 
-    public DataSetLoader(string dataPath, DatasetType dataType)
+    private readonly int rawDefaultDimX, rawDefaultDimY, rawDefaultDimZ, rawDefaultBytesToSkip;
+    private readonly DataContentFormat rawDefaultDataFormat;
+    private readonly Endianness rawDefaultEndianness;
+
+    public DataSetLoader(string dataPath, DatasetType dataType, int dimX, int dimY, int dimZ, int bytesToSkip, DataContentFormat dataFormat, Endianness endianness)
     {
       this.datasetPath = dataPath;
       this.dataType = dataType;
+      // raw dataset defaults - user specified
+      this.rawDefaultDimX = dimX;
+      this.rawDefaultDimY = dimY;
+      this.rawDefaultDimZ = dimZ;
+      this.rawDefaultBytesToSkip = bytesToSkip;
+      this.rawDefaultDataFormat = dataFormat;
+      this.rawDefaultEndianness = endianness;
     }
 
     public DataSetLoader() // constructor for client-side init where dataset path not needed to set
@@ -154,12 +165,12 @@ namespace VolumeData
       {
         Debug.LogWarning("No .ini found for RAW dataset, using defaults.");
         ini = new DatasetIniData(); // make sure the defaults are set per default values that plugin gives
-        ini.dimX = 128;
-        ini.dimY = 256;
-        ini.dimZ = 256;
-        ini.bytesToSkip = 0;
-        ini.format = DataContentFormat.Uint8;
-        ini.endianness = Endianness.LittleEndian;
+        ini.dimX = this.rawDefaultDimX;
+        ini.dimY = this.rawDefaultDimY;
+        ini.dimZ = this.rawDefaultDimZ;
+        ini.bytesToSkip = this.rawDefaultBytesToSkip;
+        ini.format = this.rawDefaultDataFormat;
+        ini.endianness = this.rawDefaultEndianness;
       }
 
       RawDatasetImporter importer = new RawDatasetImporter(fullPath, ini.dimX, ini.dimY, ini.dimZ, ini.format, ini.endianness, ini.bytesToSkip);
