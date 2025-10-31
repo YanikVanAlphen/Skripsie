@@ -1947,7 +1947,7 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 2120035972}
   _networkObjectCache: {fileID: 2120035972}
-  datasetPath: EasyVolumeRendering/DataFiles/mattatzData/Bonsai1.512x512x182.raw
+  datasetPath: EasyVolumeRendering/DataFiles/vismale.raw
   dataType: 1
   defaultPosition: {x: 0, y: 0, z: 0}
   defaultRotation: {x: 0, y: 0, z: 0, w: 1}
