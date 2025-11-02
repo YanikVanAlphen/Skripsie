@@ -84,25 +84,28 @@ public class VolumeDataNetworker : NetworkBehaviour
 
       if (!IsServer)
       {
-        DateTime startTime = DateTime.Now;
-        GetPing(NetworkManager.ClientManager.Connection, startTime);
+        long startTimeTicks = DateTime.Now.Ticks;
+        GetPing(NetworkManager.ClientManager.Connection, startTimeTicks);
       }
     }
   }
 
   [ServerRpc(RequireOwnership = false)]
-  private void GetPing(NetworkConnection clientConnection, DateTime clientSendTime)
+  private void GetPing(NetworkConnection clientConnection, long startTimeTicks)
   {
-    DateTime requestReceivedTime = DateTime.Now;
-    TargetServerPingResponse(clientConnection, clientSendTime, requestReceivedTime);
+    long requestReceivedTimeTicks = DateTime.Now.Ticks;
+    TargetServerPingResponse(clientConnection, startTimeTicks, requestReceivedTimeTicks);
   }
 
   [TargetRpc]
-  private void TargetServerPingResponse(NetworkConnection conn, DateTime clientSendTime, DateTime serverReceiveTime)
+  private void TargetServerPingResponse(NetworkConnection conn, long startTimeTicks, long requestReceivedTimeTicks)
   {
+    DateTime startTime = new DateTime(startTimeTicks);
+    DateTime requestReceivedTime = new DateTime(requestReceivedTimeTicks);
+
     DateTime serverResponseTime = DateTime.Now;
-    TimeSpan roundTripDuration = serverResponseTime - clientSendTime;
-    Debug.Log($"Client sent ping at {clientSendTime.ToString("T")}, server received at {serverReceiveTime.ToString("T")} and response came at {serverResponseTime.ToString("T")}.\nRound trip ping: {roundTripDuration.TotalMilliseconds} ms");
+    TimeSpan roundTripDuration = serverResponseTime - startTime;
+    Debug.Log($"Client sent ping at {startTime.ToString("T")}, server received at {requestReceivedTime.ToString("T")} and response came at {serverResponseTime.ToString("T")}.\nRound trip ping: {roundTripDuration.TotalMilliseconds} ms");
   }
 
   public override void OnStartClient()
