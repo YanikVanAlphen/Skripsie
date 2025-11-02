@@ -69,7 +69,7 @@ public class CrossSectionSync : NetworkBehaviour
         lastVolumeScale = volumeObject.transform.localScale;
         UpdatePlaneScale();
         // sync to clients
-        UpdatePlaneTransformServerRpc(transform.position, transform.rotation, transform.localScale);
+        UpdatePlaneTransformServerRpc(transform.localScale);
       }
       yield return new WaitForSeconds(0.1f);
     }
@@ -82,33 +82,26 @@ public class CrossSectionSync : NetworkBehaviour
       return;
     // scale cross section to be 1.5 times the size of volumetric data
     transform.localScale = volumeObject.transform.localScale * 1.5f;
-    Debug.Log($"Updated CrossSectionPlane scale to match VolumeRenderedObject: Scale={transform.localScale}");
   }
 
   [ServerRpc(RequireOwnership = false)]
-  public void UpdatePlaneTransformServerRpc(Vector3 position, Quaternion rotation, Vector3 scale)
+  public void UpdatePlaneTransformServerRpc(Vector3 scale)
   {
     if (crossSectionPlane != null)
     {
-      // apply new params
-      transform.position = position;
-      transform.rotation = rotation;
+      // apply new scale
       transform.localScale = scale;
       // let clients know to update their copies
-      RpcUpdatePlaneTransform(position, rotation, scale);
-      Debug.Log($"Server updated CrossSectionPlane: Position={position}, Rotation={rotation}, Scale={scale}");
+      RpcUpdatePlaneTransform(scale);
     }
   }
 
   [ObserversRpc]
-  private void RpcUpdatePlaneTransform(Vector3 position, Quaternion rotation, Vector3 scale)
+  private void RpcUpdatePlaneTransform(Vector3 scale)
   {
     if (crossSectionPlane != null)
     {
-      transform.position = position;
-      transform.rotation = rotation;
       transform.localScale = scale;
-      Debug.Log($"Client updated CrossSectionPlane: Position={position}, Rotation={rotation}, Scale={scale}");
     }
   }
 

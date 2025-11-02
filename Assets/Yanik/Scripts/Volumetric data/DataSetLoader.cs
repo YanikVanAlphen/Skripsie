@@ -201,6 +201,7 @@ namespace VolumeData
 
       // Code below is based on/copy of implementation of the plugin's VolumeObjectFactory.cs. The plugin auto-spawns the volumetric data gameobject,
       // so this is a customised implementation to generate all textures at runtime and apply it to the pre-configured networked volume data prefab
+      // because Fish-Networking requires the server to spawn the gameobject for it to be networked
       startTime = DateTime.Now;
       const int noiseDimX = 512;
       const int noiseDimY = 512;
@@ -222,8 +223,8 @@ namespace VolumeData
       meshRenderer.sharedMaterial.DisableKeyword("MODE_MIP");
       meshRenderer.sharedMaterial.DisableKeyword("MODE_SURF");
 
-      volumeContainer.transform.localScale = dataset.scale;
-      volumeContainer.transform.localRotation = dataset.rotation;
+      //volumeContainer.transform.localScale = dataset.scale;
+      //volumeContainer.transform.localRotation = dataset.rotation;
 
       startTime = DateTime.Now;
       // the plugin uses: meshRenderer.sharedMaterial.SetTexture("_DataTex", await dataset.GetDataTextureAsync(null));

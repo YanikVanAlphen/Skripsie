@@ -1947,9 +1947,9 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 2120035972}
   _networkObjectCache: {fileID: 2120035972}
-  datasetPath: EasyVolumeRendering/DataFiles/teneData/abdomen_2/
-  dataType: 2
-  dimX: 256
+  datasetPath: EasyVolumeRendering/DataFiles/vismale.raw
+  dataType: 1
+  dimX: 128
   dimY: 256
   dimZ: 256
   bytesToSkip: 0

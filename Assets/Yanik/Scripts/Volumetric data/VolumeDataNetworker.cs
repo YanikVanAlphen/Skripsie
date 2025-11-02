@@ -39,9 +39,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   private GameObject canvasObject;
   private bool isVolumeSpawned;
   private bool isCanvasSpawned;
-  // Stores dataset chunks for each clients NetworkConnection and used to transmit data to clients joining later.
-  private static readonly Dictionary<NetworkConnection, byte[][]> chunkStorage = new Dictionary<NetworkConnection, byte[][]>();
-  private byte[][] dataChunks; // Stored chunks for late joining clients
+  private byte[][] dataChunks; // Stored dataset chunks for late joining clients on host, and clients use to saved received chunks
   private DataSetLoader datasetLoader;
 
   private bool isRawSelected()
@@ -82,8 +80,29 @@ public class VolumeDataNetworker : NetworkBehaviour
         yield return null;
       }
       averageFPS = frameCount / timeElapsed;
-      Debug.Log($"Average FPS for the last {loggingInterval} seconds is {averageFPS:F2}.");
+      Debug.Log($"Average FPS is {averageFPS:F2}.");
+
+      if (!IsServer)
+      {
+        DateTime startTime = DateTime.Now;
+        GetPing(NetworkManager.ClientManager.Connection, startTime);
+      }
     }
+  }
+
+  [ServerRpc(RequireOwnership = false)]
+  private void GetPing(NetworkConnection clientConnection, DateTime clientSendTime)
+  {
+    DateTime requestReceivedTime = DateTime.Now;
+    TargetServerPingResponse(clientConnection, clientSendTime, requestReceivedTime);
+  }
+
+  [TargetRpc]
+  private void TargetServerPingResponse(NetworkConnection conn, DateTime clientSendTime, DateTime serverReceiveTime)
+  {
+    DateTime serverResponseTime = DateTime.Now;
+    TimeSpan roundTripDuration = serverResponseTime - clientSendTime;
+    Debug.Log($"Client sent ping at {clientSendTime.ToString("T")}, server received at {serverReceiveTime.ToString("T")} and response came at {serverResponseTime.ToString("T")}.\nRound trip ping: {roundTripDuration.TotalMilliseconds} ms");
   }
 
   public override void OnStartClient()
@@ -188,23 +207,21 @@ public class VolumeDataNetworker : NetworkBehaviour
   private IEnumerator ReceiveDatasetChunk(int chunkIndex, int totalChunks, byte[] chunk)
   {
     NetworkConnection clientConnection = NetworkManager.ClientManager.Connection;
-    // if the client networkconnection does not already exist as a key in the chunkstorage dictionary, make a new space for it.
-    if (!chunkStorage.ContainsKey(clientConnection))
+    // init data chunks if it hasnt been setup yet
+    if (dataChunks == null)
     {
       // make space for totalChunks number of transmitted chunks
-      chunkStorage[clientConnection] = new byte[totalChunks][];
+      dataChunks = new byte[totalChunks][];
     }
-    chunkStorage[clientConnection][chunkIndex] = chunk;
+    // store each chunk at the correct index to make sure it is ordered
+    dataChunks[chunkIndex] = chunk;
     Debug.Log($"Client received chunk {chunkIndex + 1}/{totalChunks}, size={chunk.Length} bytes");
-
-    // get all chunks for the current client
-    byte[][] clientChunks = chunkStorage[clientConnection];
 
     // check if all chunks have been received to decide whether data can be decompressed, deserialized and rendered yet
     bool allChunksReceived = true;
-    foreach (var clientChunk in clientChunks)
+    foreach (var dataChunk in dataChunks)
     {
-      if (clientChunk == null)
+      if (dataChunk == null)
       {
         allChunksReceived = false;
         break;
@@ -214,9 +231,9 @@ public class VolumeDataNetworker : NetworkBehaviour
     // only decompress and deserialize chunks when the full dataset has been received by client i.e. no chunk is null
     if (allChunksReceived)
     {
-      byte[] serializedData = DatasetSerializer.CombineChunks(chunkStorage[clientConnection]); // combine chunks back into 1D byte array
+      byte[] serializedData = DatasetSerializer.CombineChunks(dataChunks); // combine chunks back into 1D byte array
       VolumeDataset dataset = DatasetSerializer.Deserialize(serializedData); // decompress and deserialize data back into original form
-      chunkStorage.Remove(clientConnection);
+      dataChunks = null; // garbage collection
 
       if (dataset == null)
       {
