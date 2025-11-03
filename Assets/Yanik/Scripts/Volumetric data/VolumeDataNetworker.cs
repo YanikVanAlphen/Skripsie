@@ -93,6 +93,7 @@ public class VolumeDataNetworker : NetworkBehaviour
   [ServerRpc(RequireOwnership = false)]
   private void GetPing(NetworkConnection clientConnection, long startTimeTicks)
   {
+    // Fish-Networking does not reliably transmit DateTime, defaults to 12pm irrespective of when actually received so use # ticks representing date and time
     long requestReceivedTimeTicks = DateTime.Now.Ticks;
     TargetServerPingResponse(clientConnection, startTimeTicks, requestReceivedTimeTicks);
   }
